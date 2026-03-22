@@ -215,6 +215,7 @@ def api_update_bot(bot_id):
 def api_delete_bot(bot_id):
     _stop_bot(bot_id)
     db.delete_bot(bot_id)
+    _log_buffers.pop(bot_id, None)
     return jsonify({"status": "deleted"})
 
 
@@ -372,7 +373,7 @@ def api_backtest_run():
     b = db.get_bot(data.get("bot_id"))
     if not b: return jsonify({"error": "Bot nenalezen"}), 404
     params = json.loads(b.get("params") or "{}")
-    timeframe     = int(data.get("timeframe", 1))
+    timeframe     = max(1, int(data.get("timeframe", 1)))
     start_balance = float(data.get("start_balance", 50000))
     params["start_balance"] = start_balance
     csv_content = data.get("csv", "")
@@ -459,7 +460,7 @@ def api_optimize():
         oos_to        = data.get("oos_to", ""),
         base_params   = base_params,
         goals         = goals,
-        timeframe     = int(data.get("timeframe", 3)),
+        timeframe     = max(1, int(data.get("timeframe", 3))),
         max_combos    = int(data.get("max_combos", 500)),
     )
     if result.get("success"):

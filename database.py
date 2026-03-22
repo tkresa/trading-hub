@@ -86,8 +86,10 @@ def init_db():
                 stats_json       TEXT,
                 created_at       TEXT DEFAULT (datetime('now'))
             );
-            -- Přidej sloupce pokud chybí (pro existující DB)
-            CREATE TABLE IF NOT EXISTS _dummy_bt (id INTEGER);
+            CREATE INDEX IF NOT EXISTS idx_trades_bot_id    ON trades(bot_id);
+            CREATE INDEX IF NOT EXISTS idx_trades_entry_time ON trades(entry_time DESC);
+            CREATE INDEX IF NOT EXISTS idx_bt_bot_id         ON backtest_results(bot_id);
+            CREATE INDEX IF NOT EXISTS idx_opt_bot_id        ON optimization_results(bot_id);
         """)
     print("OK Databaze inicializovana")
 

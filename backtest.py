@@ -262,7 +262,7 @@ def _generate_signals_vectorized(df: pd.DataFrame, style_info: dict,
         if on_bar_fn:
             for i in range(30, n):
                 try:
-                    sig = on_bar_fn(df.iloc[:i+1].copy(), i, params)
+                    sig = on_bar_fn(df.iloc[:i+1], i, params)
                     if sig and isinstance(sig, dict):
                         t = sig.get("type","").upper()
                         if t == "LONG":  signals[i] = 1
