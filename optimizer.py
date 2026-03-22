@@ -10,7 +10,7 @@ optimizer.py – Walk-Forward Optimization Engine
 import re
 import itertools
 import time
-from backtest import run_backtest, load_csv, resample_df, _compute_stats_fast, _simulate_vectorized, _simulate_run_backtest_style, detect_bot_style, _sanitize_code, _generate_signals_vectorized
+from backtest import run_backtest, load_csv, load_parquet, resample_df, _compute_stats_fast, _simulate_vectorized, _simulate_run_backtest_style, detect_bot_style, _sanitize_code, _generate_signals_vectorized
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -155,8 +155,8 @@ def score_result(stats: dict, goals: dict) -> float:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run_optimization(
-    bot_code:     str,
-    csv_content:  str,
+    bot_code:      str,
+    csv_content:   str,
     insample_from: str,
     insample_to:   str,
     oos_from:      str,
@@ -165,6 +165,7 @@ def run_optimization(
     goals:         dict,
     timeframe:     int = 3,
     max_combos:    int = 500,
+    parquet_bytes: bytes = None,
 ) -> dict:
     """
     Walk-Forward Optimization.
@@ -189,10 +190,15 @@ def run_optimization(
     t0 = time.time()
 
     try:
-        # 1. Načti a resampluj CSV
-        df_full = load_csv(csv_content)
-        if df_full is None or df_full.empty:
-            return {"success": False, "error": "Nepodařilo se načíst CSV"}
+        # 1. Načti a resampluj data (Parquet má prioritu)
+        if parquet_bytes:
+            df_full = load_parquet(parquet_bytes)
+            if df_full is None or df_full.empty:
+                return {"success": False, "error": "Nepodařilo se načíst Parquet soubor"}
+        else:
+            df_full = load_csv(csv_content)
+            if df_full is None or df_full.empty:
+                return {"success": False, "error": "Nepodařilo se načíst CSV"}
 
         if timeframe > 1:
             df_full = resample_df(df_full, timeframe)

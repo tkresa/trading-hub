@@ -12,7 +12,7 @@ import numpy as np
 import json
 import re
 import traceback
-from io import StringIO
+from io import StringIO, BytesIO
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -31,42 +31,55 @@ def resample_df(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CSV LOADER
+#  DATA LOADERS (CSV + Parquet)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def _normalize_df(df: pd.DataFrame) -> pd.DataFrame | None:
+    """Normalizuje sloupce a index — společné pro CSV i Parquet."""
+    df.columns = [c.strip().lower() for c in df.columns]
+    col_map = {}
+    for c in df.columns:
+        if any(x in c for x in ["date","time","timestamp","ts_event","ts_recv"]):
+            col_map[c] = "datetime"
+        elif c == "open":              col_map[c] = "open"
+        elif c == "high":              col_map[c] = "high"
+        elif c == "low":               col_map[c] = "low"
+        elif c in ("close", "last"):   col_map[c] = "close"
+        elif "vol" in c:               col_map[c] = "volume"
+    df = df.rename(columns=col_map)
+    for r in ["open", "high", "low", "close"]:
+        if r not in df.columns:
+            return None
+    if "datetime" in df.columns:
+        df["datetime"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce")
+        df["datetime"] = df["datetime"].dt.tz_localize(None)
+        df = df.set_index("datetime")
+    elif not isinstance(df.index, pd.DatetimeIndex):
+        return None
+    else:
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+    if "volume" not in df.columns:
+        df["volume"] = 1000
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df.dropna(subset=["open", "high", "low", "close"]).sort_index()
+
+
+def load_parquet(data: bytes) -> pd.DataFrame | None:
+    """Načte Parquet soubor z bytes."""
+    try:
+        df = pd.read_parquet(BytesIO(data))
+        return _normalize_df(df)
+    except Exception:
+        return None
+
 
 def load_csv(csv_content: str) -> pd.DataFrame | None:
     try:
         df = pd.read_csv(StringIO(csv_content))
-        df.columns = [c.strip().lower() for c in df.columns]
-
-        col_map = {}
-        for c in df.columns:
-            if any(x in c for x in ["date","time","timestamp","ts_event","ts_recv"]):
-                col_map[c] = "datetime"
-            elif c == "open":   col_map[c] = "open"
-            elif c == "high":   col_map[c] = "high"
-            elif c == "low":    col_map[c] = "low"
-            elif c in ("close","last"): col_map[c] = "close"
-            elif "vol" in c:    col_map[c] = "volume"
-
-        df = df.rename(columns=col_map)
-        for r in ["open","high","low","close"]:
-            if r not in df.columns:
-                return None
-
-        if "datetime" in df.columns:
-            df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
-            df["datetime"] = df["datetime"].dt.tz_localize(None)
-            df = df.set_index("datetime")
-
-        if "volume" not in df.columns:
-            df["volume"] = 1000
-
-        for col in ["open","high","low","close","volume"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        return df.dropna(subset=["open","high","low","close"]).sort_index()
+        return _normalize_df(df)
     except Exception:
         return None
 
@@ -879,16 +892,23 @@ if "DEFAULT_PARAMS" in dir() or "DEFAULT_PARAMS" in globals():
 
 def run_backtest(bot_code: str, csv_content: str,
                  period_from: str, period_to: str,
-                 params: dict, timeframe_minutes: int = 1) -> dict:
+                 params: dict, timeframe_minutes: int = 1,
+                 parquet_bytes: bytes = None) -> dict:
     try:
         import time
         t0 = time.time()
 
-        # 1. Načti CSV
-        df = load_csv(csv_content)
-        if df is None or df.empty:
-            return {"success": False,
-                    "error": "Nepodařilo se načíst CSV. Formát: datetime,open,high,low,close,volume"}
+        # 1. Načti data (Parquet má prioritu — rychlejší)
+        if parquet_bytes:
+            df = load_parquet(parquet_bytes)
+            if df is None or df.empty:
+                return {"success": False,
+                        "error": "Nepodařilo se načíst Parquet soubor. Zkontroluj formát sloupců."}
+        else:
+            df = load_csv(csv_content)
+            if df is None or df.empty:
+                return {"success": False,
+                        "error": "Nepodařilo se načíst CSV. Formát: datetime,open,high,low,close,volume"}
 
         # 2. Resampling
         if timeframe_minutes > 1:

@@ -337,24 +337,37 @@ def api_stats():
 @app.route("/api/csv/upload", methods=["POST"])
 def api_csv_upload():
     """
-    Přijme CSV soubor přes multipart upload.
+    Přijme CSV nebo Parquet soubor přes multipart upload.
     Vrátí csv_id pro použití v backtestu a optimalizaci.
     """
-    # Multipart upload (preferovaný)
     if "file" in request.files:
         f = request.files["file"]
-        filename = f.filename or ""
-        if not filename.lower().endswith(".csv"):
-            return jsonify({"error": "Soubor musí mít příponu .csv"}), 400
-        csv_id   = uuid.uuid4().hex[:12]
-        csv_dir  = Path(__file__).parent / "data" / "csv_cache"
-        csv_dir.mkdir(exist_ok=True)
-        csv_path = csv_dir / f"{csv_id}.csv"
-        f.save(str(csv_path))
-        rows = sum(1 for _ in open(csv_path, encoding="utf-8", errors="replace")) - 1
-        return jsonify({"csv_id": csv_id, "rows": rows})
+        filename = (f.filename or "").lower()
+        if filename.endswith(".parquet"):
+            csv_id   = uuid.uuid4().hex[:12]
+            csv_dir  = Path(__file__).parent / "data" / "csv_cache"
+            csv_dir.mkdir(exist_ok=True)
+            path = csv_dir / f"{csv_id}.parquet"
+            f.save(str(path))
+            # Spočítej řádky přes pandas
+            try:
+                import pandas as pd
+                rows = len(pd.read_parquet(str(path), columns=["close"] if True else []))
+            except Exception:
+                rows = 0
+            return jsonify({"csv_id": csv_id, "rows": rows, "format": "parquet"})
+        elif filename.endswith(".csv"):
+            csv_id   = uuid.uuid4().hex[:12]
+            csv_dir  = Path(__file__).parent / "data" / "csv_cache"
+            csv_dir.mkdir(exist_ok=True)
+            csv_path = csv_dir / f"{csv_id}.csv"
+            f.save(str(csv_path))
+            rows = sum(1 for _ in open(csv_path, encoding="utf-8", errors="replace")) - 1
+            return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv"})
+        else:
+            return jsonify({"error": "Soubor musí mít příponu .csv nebo .parquet"}), 400
 
-    # Fallback: JSON upload (pro menší soubory)
+    # Fallback: JSON upload (pro menší CSV soubory)
     csv_data = request.json.get("csv", "") if request.is_json else ""
     if not csv_data:
         return jsonify({"error": "Prázdné CSV nebo chybí soubor"}), 400
@@ -364,17 +377,29 @@ def api_csv_upload():
     csv_path = csv_dir / f"{csv_id}.csv"
     csv_path.write_text(csv_data, encoding="utf-8")
     rows = csv_data.count("\n")
-    return jsonify({"csv_id": csv_id, "rows": rows})
+    return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv"})
+
+
+def _load_data_by_id(csv_id: str):
+    """Načte data ze serveru podle ID (CSV nebo Parquet). Brání path traversal.
+    Vrací (typ, obsah) kde typ je 'csv' nebo 'parquet' a obsah je str/bytes."""
+    if not re.fullmatch(r'[0-9a-f]{12}', csv_id):
+        return None, None
+    base = Path(__file__).parent / "data" / "csv_cache"
+    parquet_path = base / f"{csv_id}.parquet"
+    csv_path     = base / f"{csv_id}.csv"
+    if parquet_path.exists():
+        return "parquet", parquet_path.read_bytes()
+    if csv_path.exists():
+        return "csv", csv_path.read_text(encoding="utf-8")
+    return None, None
 
 
 def _load_csv_by_id(csv_id: str) -> str | None:
-    """Načte CSV ze serveru podle ID. Brání path traversal."""
-    # Povolíme pouze hex znaky (bezpečné ID)
-    if not re.fullmatch(r'[0-9a-f]{12}', csv_id):
-        return None
-    csv_path = Path(__file__).parent / "data" / "csv_cache" / f"{csv_id}.csv"
-    if csv_path.exists():
-        return csv_path.read_text(encoding="utf-8")
+    """Zpětná kompatibilita — vrací CSV obsah nebo None."""
+    fmt, content = _load_data_by_id(csv_id)
+    if fmt == "csv":
+        return content
     return None
 
 
@@ -390,11 +415,17 @@ def api_backtest_run():
     if "commission" in data: params["commission"] = float(data["commission"])
     if "slippage"   in data: params["slippage"]   = float(data["slippage"])
     csv_content = data.get("csv", "")
+    csv_bytes   = None
     if not csv_content and data.get("csv_id"):
-        csv_content = _load_csv_by_id(data["csv_id"]) or ""
+        fmt, content = _load_data_by_id(data["csv_id"])
+        if fmt == "parquet":
+            csv_bytes = content
+        else:
+            csv_content = content or ""
     result = run_backtest(b["code"], csv_content,
                           data.get("period_from",""), data.get("period_to",""),
-                          params, timeframe_minutes=timeframe)
+                          params, timeframe_minutes=timeframe,
+                          parquet_bytes=csv_bytes)
     if result["success"]:
         s = result["stats"]
         db.save_backtest(b["id"], b["name"], data.get("period_from",""), data.get("period_to",""),
@@ -462,8 +493,13 @@ def api_optimize():
     }
 
     csv_content = data.get("csv", "")
+    csv_bytes   = None
     if not csv_content and data.get("csv_id"):
-        csv_content = _load_csv_by_id(data["csv_id"]) or ""
+        fmt, content = _load_data_by_id(data["csv_id"])
+        if fmt == "parquet":
+            csv_bytes = content
+        else:
+            csv_content = content or ""
     result = run_optimization(
         bot_code      = b["code"] or "",
         csv_content   = csv_content,
@@ -538,18 +574,19 @@ def api_opt_apply(result_id):
 # ═══ START ═════════════════════════════════════════════════════════════════
 
 def cleanup_csv_cache():
-    """Smaže CSV soubory starší než 24 hodin."""
+    """Smaže CSV/Parquet soubory starší než 24 hodin."""
     cache_dir = Path(__file__).parent / "data" / "csv_cache"
     if not cache_dir.exists():
         return
     now = time.time()
     deleted = 0
-    for f in cache_dir.glob("*.csv"):
-        if now - f.stat().st_mtime > 86400:
-            f.unlink()
-            deleted += 1
+    for pattern in ("*.csv", "*.parquet"):
+        for f in cache_dir.glob(pattern):
+            if now - f.stat().st_mtime > 86400:
+                f.unlink()
+                deleted += 1
     if deleted:
-        print(f"🧹 CSV cache: smazáno {deleted} starých souborů")
+        print(f"Cache: smazano {deleted} starych souboru")
 
 
 if __name__ == "__main__":

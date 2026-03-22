@@ -545,10 +545,10 @@ tr:hover td{background:var(--s2)66}
           <div class="card-title">CSV Data</div>
           <div class="drop-zone" id="dz" onclick="document.getElementById('csv-inp').click()">
             <div class="dz-ic">📂</div>
-            <p id="dz-txt">Přetáhni CSV nebo klikni pro výběr</p>
-            <p style="font-size:11px;margin-top:6px">Formát: datetime, open, high, low, close, volume</p>
+            <p id="dz-txt">Přetáhni CSV / Parquet nebo klikni pro výběr</p>
+            <p style="font-size:11px;margin-top:6px">CSV nebo Parquet · sloupce: datetime, open, high, low, close, volume</p>
           </div>
-          <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="handleCsv(this)">
+          <input type="file" id="csv-inp" accept=".csv,.parquet" style="display:none" onchange="handleCsv(this)">
           <div id="csv-info" style="display:none;margin-top:10px;font-size:12px;color:var(--green);font-family:var(--mono)"></div>
         </div>
 
@@ -1540,7 +1540,7 @@ function btGoBack() {
 async function runBacktest() {
   const botId = document.getElementById('bt-bot').value;
   if (!botId)                      { toast('Vyber bota!','error'); return; }
-  if (!csvServerId && !csvContent) { toast('Nahraj CSV soubor!','error'); return; }
+  if (!csvServerId && !csvContent) { toast('Nahraj CSV nebo Parquet soubor!','error'); return; }
   const btn = document.getElementById('bt-btn');
   btn.textContent = '⏳ Backtest...'; btn.disabled = true;
   showProgress('📊 Probíhá backtest...');
