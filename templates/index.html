@@ -2029,7 +2029,6 @@ async function loadBtHistory() {
     const pos = (h.total_pnl||0)>=0;
     return `<tr style="cursor:pointer" onclick="loadHistDetail(${h.id})">
       <td><span class="badge badge-blue">${esc(h.bot_name)}</span></td>
-      <td class="td-m">–</td>
       <td class="td-m">$${(h.starting_balance||50000).toLocaleString()}</td>
       <td class="td-m">${h.total_trades}</td>
       <td class="td-m">${h.winrate}%</td>

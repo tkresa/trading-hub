@@ -534,6 +534,7 @@ def api_optimize():
         goals         = goals,
         timeframe     = max(1, int(data.get("timeframe", 3))),
         max_combos    = int(data.get("max_combos", 500)),
+        parquet_bytes = csv_bytes,
     )
     if result.get("success"):
         db.save_optimization(
