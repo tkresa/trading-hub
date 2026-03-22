@@ -106,17 +106,28 @@ def reinject_params(code, old_params, new_params):
     """
     Nahradí stávající hodnoty params v kódu novými hodnotami.
     Používá se při editaci, kdy kód již nemá 'DOPLNIT' (bylo nahrazeno).
+    Strategie:
+    1. Pokud známe starou hodnotu z old_params → nahraď ji
+    2. Pokud ne → hledej vzor KEY = "cokoli" a nahraď hodnotu
     """
     lines = code.split('\n')
     result = []
     for line in lines:
         modified = line
         for key, new_val in new_params.items():
+            if key not in line:
+                continue
             old_val = old_params.get(key)
-            if key in line and old_val is not None:
+            if old_val is not None:
                 modified = re.sub(r'"' + re.escape(str(old_val)) + '"', f'"{new_val}"', modified)
                 modified = re.sub(r"'" + re.escape(str(old_val)) + "'", f'"{new_val}"', modified)
-                break
+            else:
+                # Fallback: nahraď hodnotu v přiřazení KEY = "cokoli"
+                modified = re.sub(
+                    re.escape(key) + r'\s*=\s*["\'][^"\']*["\']',
+                    f'{key} = "{new_val}"', modified
+                )
+            break
         result.append(modified)
     return '\n'.join(result)
 
