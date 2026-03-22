@@ -362,6 +362,18 @@ def api_csv_upload():
             csv_dir.mkdir(exist_ok=True)
             csv_path = csv_dir / f"{csv_id}.csv"
             f.save(str(csv_path))
+            # Konvertuj CSV → Parquet pro rychlejší načítání
+            try:
+                import pandas as pd
+                from backtest import load_csv
+                df = load_csv(csv_path.read_text(encoding="utf-8", errors="replace"))
+                if df is not None and not df.empty:
+                    pq_path = csv_dir / f"{csv_id}.parquet"
+                    df.to_parquet(str(pq_path), index=True)
+                    csv_path.unlink()  # smaž původní CSV
+                    return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet"})
+            except Exception:
+                pass  # fallback: ponech CSV
             rows = sum(1 for _ in open(csv_path, encoding="utf-8", errors="replace")) - 1
             return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv"})
         else:
@@ -374,6 +386,17 @@ def api_csv_upload():
     csv_id   = uuid.uuid4().hex[:12]
     csv_dir  = Path(__file__).parent / "data" / "csv_cache"
     csv_dir.mkdir(exist_ok=True)
+    # Konvertuj CSV → Parquet
+    try:
+        import pandas as pd
+        from backtest import load_csv
+        df = load_csv(csv_data)
+        if df is not None and not df.empty:
+            pq_path = csv_dir / f"{csv_id}.parquet"
+            df.to_parquet(str(pq_path), index=True)
+            return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet"})
+    except Exception:
+        pass
     csv_path = csv_dir / f"{csv_id}.csv"
     csv_path.write_text(csv_data, encoding="utf-8")
     rows = csv_data.count("\n")
