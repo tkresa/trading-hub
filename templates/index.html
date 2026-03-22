@@ -1,0 +1,2411 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trading Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:       #0e1117;
+  --s1:       #151b27;
+  --s2:       #1c2333;
+  --s3:       #232e42;
+  --b1:       #2a3650;
+  --b2:       #344060;
+  --b3:       #3d4d72;
+  --blue:     #3b82f6;
+  --blue-dim: #3b82f618;
+  --blue-brd: #3b82f640;
+  --cyan:     #06b6d4;
+  --green:    #10b981;
+  --green-dim:#10b98118;
+  --red:      #ef4444;
+  --red-dim:  #ef444418;
+  --yellow:   #f59e0b;
+  --purple:   #8b5cf6;
+  --tx:       #f0f4f8;
+  --tx2:      #b8c9dc;
+  --tx3:      #7a90a8;
+  --mono:     'JetBrains Mono',monospace;
+  --sans:     'Inter',sans-serif;
+  --r:        10px;
+  --r2:       6px;
+  --shadow:   0 4px 24px #00000040;
+  --shadow2:  0 2px 12px #00000030;
+}
+
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:4px}
+button{cursor:pointer;font-family:var(--sans);transition:all .15s}
+input,textarea,select{font-family:var(--mono);font-size:13px;color:var(--tx);background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:8px 12px;outline:none;transition:border .15s,box-shadow .15s;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-dim)}
+select option{background:var(--s2)}
+textarea{resize:vertical}
+
+/* ═══ LAYOUT ══════════════════════════════════════════════════════ */
+#wrap{display:grid;grid-template-rows:56px 1fr;height:100vh}
+#body{display:grid;grid-template-columns:240px 1fr;overflow:hidden}
+#content{overflow-y:auto;padding:24px;background:var(--bg)}
+
+/* ═══ TOPBAR ══════════════════════════════════════════════════════ */
+#topbar{
+  background:var(--s1);
+  border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;gap:16px;
+  position:relative;z-index:20;
+}
+.logo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+  box-shadow:0 0 20px #3b82f630;
+}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--tx)}
+.brand-sub{font-size:10px;color:var(--tx3);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono)}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:14px}
+.tb-pill{display:flex;align-items:center;gap:7px;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--tx2);font-family:var(--mono)}
+.pulse{width:7px;height:7px;border-radius:50%}
+.pulse.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s ease-in-out infinite}
+.pulse.off{background:var(--tx3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ═══ SIDEBAR ══════════════════════════════════════════════════════ */
+#sidebar{
+  background:var(--s1);border-right:1px solid var(--b1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.nav-group{padding:16px 12px 8px}
+.nav-label{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--tx2);padding:0 8px;margin-bottom:6px;font-family:var(--mono);font-weight:600}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:var(--r2);
+  cursor:pointer;transition:all .15s;
+  color:var(--tx2);font-size:13px;font-weight:500;
+  border:1px solid transparent;user-select:none;
+  margin-bottom:2px;
+}
+.nav-item:hover{background:var(--s2);color:var(--tx)}
+.nav-item.active{
+  background:var(--blue-dim);color:var(--blue);
+  border-color:var(--blue-brd);
+}
+.nav-item .ni-icon{font-size:15px;width:18px;text-align:center}
+.nav-item .ni-badge{
+  margin-left:auto;background:var(--blue);color:#fff;
+  border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;
+}
+.nav-divider{height:1px;background:var(--b1);margin:8px 12px}
+
+.sidebar-bots{flex:1;overflow-y:auto;padding:0 8px 8px}
+.sb-bot{
+  background:var(--s2);border:1px solid var(--b1);
+  border-radius:var(--r2);padding:10px 12px;
+  margin-bottom:4px;cursor:pointer;transition:all .15s;
+}
+.sb-bot:hover{border-color:var(--b2);background:var(--s3)}
+.sb-bot-name{font-size:13px;font-weight:600;color:var(--tx);margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-bot-row{display:flex;align-items:center;justify-content:space-between}
+.sb-bot-inst{font-size:11px;color:var(--tx2);font-family:var(--mono)}
+
+.sidebar-footer{padding:10px 8px;border-top:1px solid var(--b1)}
+.btn-new-bot{
+  width:100%;padding:9px;border-radius:var(--r2);
+  background:transparent;border:1px dashed var(--b2);
+  color:var(--tx3);font-size:12px;letter-spacing:.5px;
+  transition:all .15s;
+}
+.btn-new-bot:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+
+/* ═══ BADGES ══════════════════════════════════════════════════════ */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-family:var(--mono);letter-spacing:.5px;
+  text-transform:uppercase;padding:2px 8px;border-radius:4px;
+  font-weight:600;
+}
+.badge-green{background:var(--green-dim);color:var(--green);border:1px solid #10b98135}
+.badge-red{background:var(--red-dim);color:var(--red);border:1px solid #ef444435}
+.badge-blue{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue-brd)}
+.badge-grey{background:#ffffff08;color:var(--tx3);border:1px solid var(--b1)}
+.badge-yellow{background:#f59e0b18;color:var(--yellow);border:1px solid #f59e0b35}
+
+/* ═══ CARDS ═══════════════════════════════════════════════════════ */
+.card{
+  background:var(--s1);border:1px solid var(--b1);
+  border-radius:var(--r);padding:20px 22px;
+}
+.card-title{
+  font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--tx2);margin-bottom:16px;display:flex;
+  align-items:center;gap:8px;font-family:var(--mono);font-weight:600;
+}
+.card-title::before{content:'';width:3px;height:14px;background:var(--blue);border-radius:2px}
+
+/* ═══ BUTTONS ══════════════════════════════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:var(--r2);
+  font-size:13px;font-weight:500;border:none;
+}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2563eb;box-shadow:0 0 20px #3b82f640}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-ghost{background:transparent;border:1px solid var(--b2);color:var(--tx2)}
+.btn-ghost:hover{border-color:var(--b3);color:var(--tx);background:var(--s2)}
+.btn-sm{padding:5px 12px;font-size:12px;border-radius:4px}
+.btn-run{background:var(--green-dim);color:var(--green);border:1px solid #10b98135}
+.btn-run:hover{background:#10b98128}
+.btn-stop{background:var(--red-dim);color:var(--red);border:1px solid #ef444435}
+.btn-stop:hover{background:#ef444428}
+
+/* ═══ GRID ════════════════════════════════════════════════════════ */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.col{display:flex;flex-direction:column;gap:14px}
+
+/* ═══ KPI TILES ═══════════════════════════════════════════════════ */
+.kpi{padding:18px 20px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r)}
+.kpi-label{font-size:11px;color:var(--tx2);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;font-weight:600}
+.kpi-value{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1}
+.kpi-sub{font-size:11px;color:var(--tx3);margin-top:5px}
+.kpi.accent{border-color:var(--blue-brd);background:linear-gradient(135deg,var(--s1),#1c2a3d)}
+
+/* ═══ TABLES ══════════════════════════════════════════════════════ */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--tx2);
+  padding:10px 12px;text-align:left;
+  border-bottom:1px solid var(--b1);white-space:nowrap;font-weight:600;
+}
+td{padding:10px 12px;border-bottom:1px solid var(--b1)22;font-size:13px;vertical-align:middle}
+tr:hover td{background:var(--s2)66}
+.td-m{font-family:var(--mono);font-size:12px}
+.td-pos{color:var(--green);font-family:var(--mono);font-weight:600}
+.td-neg{color:var(--red);font-family:var(--mono);font-weight:600}
+
+/* ═══ MODAL ═══════════════════════════════════════════════════════ */
+.overlay{position:fixed;inset:0;background:#00000070;backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.show{display:flex}
+.modal{
+  background:var(--s1);border:1px solid var(--b2);
+  border-radius:14px;width:720px;max-width:95vw;
+  max-height:90vh;display:flex;flex-direction:column;
+  box-shadow:0 24px 80px #00000060;
+  animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:none}}
+.modal-hdr{
+  padding:20px 24px;border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.modal-title{font-size:15px;font-weight:600;color:var(--tx)}
+.modal-body{padding:24px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:18px}
+.modal-ftr{padding:16px 24px;border-top:1px solid var(--b1);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+.btn-x{background:none;border:none;color:var(--tx3);font-size:18px;width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.btn-x:hover{background:var(--s2);color:var(--tx)}
+
+/* ═══ FORM ════════════════════════════════════════════════════════ */
+.frow{display:flex;flex-direction:column;gap:6px}
+.frow label{font-size:11px;font-family:var(--mono);color:var(--tx2);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fhint{font-size:11px;color:var(--tx3);margin-top:3px}
+
+/* ═══ STEPS ═══════════════════════════════════════════════════════ */
+.steps{display:flex;align-items:center;gap:0;margin-bottom:20px}
+.step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx3)}
+.step.active{color:var(--tx)}
+.step.done{color:var(--green)}
+.step-num{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.step.active .step-num{border-color:var(--blue);color:var(--blue)}
+.step.done .step-num{background:var(--green);border-color:var(--green);color:#fff}
+.step-line{flex:1;height:1px;background:var(--b1);min-width:20px}
+
+/* ═══ TERMINAL ════════════════════════════════════════════════════ */
+.terminal{
+  background:#080c12;border:1px solid var(--b1);border-radius:var(--r2);
+  padding:14px 16px;font-family:var(--mono);font-size:12px;
+  line-height:1.7;height:240px;overflow-y:auto;color:#4ade80;
+}
+
+/* ═══ EMPTY ════════════════════════════════════════════════════════ */
+.empty{text-align:center;padding:60px 20px;color:var(--tx3)}
+.empty-icon{font-size:44px;margin-bottom:14px;opacity:.4}
+.empty p{font-size:13px;line-height:1.6}
+
+/* ═══ PAGE HEADER ══════════════════════════════════════════════════ */
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px}
+.page-title{font-size:20px;font-weight:700;color:var(--tx);margin-bottom:3px}
+.page-sub{font-size:13px;color:var(--tx2)}
+
+/* ═══ FILTER BAR ══════════════════════════════════════════════════ */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{width:auto;padding:7px 12px;font-size:12px}
+
+/* ═══ BACKTEST ════════════════════════════════════════════════════ */
+.bt-kpi{
+  background:var(--s2);border:1px solid var(--b1);
+  border-radius:var(--r2);padding:16px 18px;
+}
+.bt-kpi-val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
+.bt-kpi-lbl{font-size:10px;color:var(--tx2);margin-top:5px;letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);font-weight:600}
+
+.wl-card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 20px}
+.wl-title{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.wl-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--b1)44;font-size:13px}
+.wl-row:last-child{border-bottom:none}
+.wl-label{color:var(--tx2)}
+.wl-val{font-family:var(--mono);font-weight:600}
+
+.drop-zone{
+  border:2px dashed var(--b2);border-radius:var(--r);
+  padding:36px;text-align:center;cursor:pointer;
+  transition:all .2s;color:var(--tx3);
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+.drop-zone .dz-ic{font-size:32px;margin-bottom:10px}
+
+.chart-wrap{position:relative;height:220px}
+.chart-wrap-lg{position:relative;height:280px}
+
+/* ═══ PAGINATION ══════════════════════════════════════════════════ */
+.pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px}
+.pg-btn{background:var(--s2);border:1px solid var(--b1);color:var(--tx2);padding:5px 12px;border-radius:var(--r2);font-size:12px;font-family:var(--mono)}
+.pg-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+.pg-btn:disabled{opacity:.35;cursor:not-allowed}
+.pg-info{font-size:12px;color:var(--tx3);font-family:var(--mono)}
+
+/* ═══ PROGRESS BAR ═══════════════════════════════════════════ */
+.progress-overlay{
+  position:fixed;inset:0;background:#00000060;backdrop-filter:blur(2px);
+  z-index:200;display:none;align-items:center;justify-content:center;
+}
+.progress-overlay.show{display:flex}
+.progress-box{
+  background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);
+  padding:28px 36px;min-width:380px;text-align:center;
+  box-shadow:0 24px 80px #00000060;
+}
+.progress-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.progress-msg{font-size:12px;color:var(--tx3);margin-bottom:16px;font-family:var(--mono)}
+.progress-bar-wrap{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));
+  border-radius:3px;transition:width .4s ease;width:0%}
+.progress-pct{font-family:var(--mono);font-size:12px;color:var(--blue);margin-top:8px}
+
+/* ═══ ANIMATIONS ══════════════════════════════════════════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.fade-up{animation:fadeUp .25s ease}
+
+/* ═══ TOAST ════════════════════════════════════════════════════════ */
+.toast{
+  padding:12px 18px;border-radius:var(--r2);font-size:13px;
+  min-width:260px;max-width:380px;cursor:pointer;
+  animation:fadeUp .2s ease;font-family:var(--mono);
+  box-shadow:var(--shadow);
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<!-- ══ TOPBAR ══════════════════════════════════════════════════════ -->
+<div id="topbar">
+  <div class="topbar-left">
+    <div class="logo">⚡</div>
+    <div>
+      <div class="brand-name">Trading Hub</div>
+      <div class="brand-sub">Bot Manager v1.0</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="tb-pill">
+      <div class="pulse off" id="run-dot"></div>
+      <span id="run-txt">Žádný bot neběží</span>
+    </div>
+    <div class="tb-pill" id="clock" style="color:var(--tx)">--:--:--</div>
+  </div>
+</div>
+
+<div id="body">
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════ -->
+<div id="sidebar">
+  <div class="nav-group">
+    <div class="nav-label">Navigace</div>
+    <div class="nav-item active" onclick="navigate('bots',this)">
+      <span class="ni-icon">🤖</span> Boti
+      <span class="ni-badge" id="badge-bots">0</span>
+    </div>
+    <div class="nav-item" onclick="navigate('tradelog',this)">
+      <span class="ni-icon">📋</span> Trade Log
+    </div>
+    <div class="nav-item" onclick="navigate('stats',this)">
+      <span class="ni-icon">📊</span> Statistiky
+    </div>
+    <div class="nav-item" onclick="navigate('backtest',this)">
+      <span class="ni-icon">🔬</span> Backtest
+    </div>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-group" style="padding-bottom:4px">
+    <div class="nav-label">Aktivní boti</div>
+  </div>
+  <div class="sidebar-bots" id="sb-bots"></div>
+
+  <div class="sidebar-footer">
+    <button class="btn-new-bot" onclick="openAddBot()">＋ Přidat bota</button>
+  </div>
+</div>
+
+<!-- ══ CONTENT ══════════════════════════════════════════════════════ -->
+<div id="content">
+
+<!-- ── PAGE: BOTI ─────────────────────────────────────────────── -->
+<div id="page-bots" class="fade-up">
+  <div class="page-hdr">
+    <div>
+      <div class="page-title">Boti</div>
+      <div class="page-sub">Spravuj a spouštěj své trading boty</div>
+    </div>
+    <button class="btn btn-primary" onclick="openAddBot()">＋ Přidat bota</button>
+  </div>
+  <div id="bots-grid" class="col"></div>
+</div>
+
+<!-- ── PAGE: TRADE LOG ────────────────────────────────────────── -->
+<div id="page-tradelog" class="fade-up" style="display:none">
+  <div class="page-hdr">
+    <div>
+      <div class="page-title">Trade Log</div>
+      <div class="page-sub">Všechny uzavřené obchody</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="filter-bar">
+      <select id="tl-bot" onchange="loadTrades()" style="width:180px">
+        <option value="all">Všichni boti</option>
+      </select>
+      <select id="tl-period" onchange="loadTrades()" style="width:150px">
+        <option value="">Vše</option>
+        <option value="week">Tento týden</option>
+        <option value="month">Tento měsíc</option>
+      </select>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--tx3)" id="tl-count"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Bot</th><th>Instrument</th><th>Směr</th><th>Kontrakty</th>
+          <th>Entry</th><th>Exit</th><th>SL</th><th>TP</th>
+          <th>PnL</th><th>Entry Time</th><th>Exit Time</th>
+        </tr></thead>
+        <tbody id="tl-tbody"></tbody>
+      </table>
+    </div>
+    <div id="tl-empty" class="empty" style="display:none">
+      <div class="empty-icon">📋</div><p>Žádné trades zatím.</p>
+    </div>
+    <div class="pagination" id="tl-pagination"></div>
+  </div>
+</div>
+
+<!-- ── PAGE: STATISTIKY ───────────────────────────────────────── -->
+<div id="page-stats" class="fade-up" style="display:none">
+  <div class="page-hdr">
+    <div>
+      <div class="page-title">Statistiky</div>
+      <div class="page-sub">Výkonnost botů a equity křivka</div>
+    </div>
+    <select id="stats-period" onchange="loadStats()" style="width:140px;padding:8px 12px">
+      <option value="">Vše</option>
+      <option value="week">Týden</option>
+      <option value="month">Měsíc</option>
+    </select>
+  </div>
+
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi accent">
+      <div class="kpi-label">Total PnL</div>
+      <div class="kpi-value" id="st-pnl" style="color:var(--green)">$0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Winrate</div>
+      <div class="kpi-value" id="st-wr">0%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Celkem Trades</div>
+      <div class="kpi-value" id="st-trades">0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Aktivní Boti</div>
+      <div class="kpi-value" id="st-active">0</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <div class="card-title">Equity křivka</div>
+      <div class="chart-wrap"><canvas id="eq-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Výkonnost botů</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Bot</th><th>Instrument</th><th>Trades</th><th>Winrate</th><th>Avg R:R</th><th>Prům. délka</th><th>Total PnL</th></tr></thead>
+          <tbody id="st-tbody"></tbody>
+        </table>
+      </div>
+      <div id="st-empty" class="empty" style="display:none">
+        <div class="empty-icon">📊</div><p>Žádná data.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAGE: BACKTEST ─────────────────────────────────────────── -->
+<div id="page-backtest" class="fade-up" style="display:none">
+
+  <!-- VIEW: FORMULÁŘ -->
+  <div id="bt-view-form">
+    <div class="page-hdr">
+      <div>
+        <div class="page-title">Backtest</div>
+        <div class="page-sub">Otestuj strategii na historických datech</div>
+      </div>
+    </div>
+
+    <div class="g2" style="align-items:start;gap:16px">
+      <div class="col">
+        <div class="card">
+          <div class="card-title">Konfigurace</div>
+          <div class="col" style="gap:12px">
+            <div class="frow">
+              <label>Vyber bota</label>
+              <select id="bt-bot"></select>
+            </div>
+            <div class="frow">
+              <label>Timeframe</label>
+              <select id="bt-tf">
+                <option value="1">1 min</option>
+                <option value="3" selected>3 min (doporučeno)</option>
+                <option value="5">5 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+              </select>
+              <p class="fhint">Nahraj 1min CSV — automaticky převede na vybraný TF</p>
+            </div>
+            <div class="frow">
+              <label>Starting Balance ($)</label>
+              <input type="number" id="bt-balance" value="50000" min="1000" step="1000">
+              <p class="fhint">Počáteční hodnota účtu pro equity křivku</p>
+            </div>
+            <div class="fgrid">
+              <div class="frow">
+                <label>Datum + čas od</label>
+                <input type="datetime-local" id="bt-from" value="">
+                <p class="fhint">Nechej prázdné pro vše od začátku</p>
+              </div>
+              <div class="frow">
+                <label>Datum + čas do</label>
+                <input type="datetime-local" id="bt-to" value="">
+                <p class="fhint">Nechej prázdné pro vše do konce</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CSV Data</div>
+          <div class="drop-zone" id="dz" onclick="document.getElementById('csv-inp').click()">
+            <div class="dz-ic">📂</div>
+            <p id="dz-txt">Přetáhni CSV nebo klikni pro výběr</p>
+            <p style="font-size:11px;margin-top:6px">Formát: datetime, open, high, low, close, volume</p>
+          </div>
+          <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="handleCsv(this)">
+          <div id="csv-info" style="display:none;margin-top:10px;font-size:12px;color:var(--green);font-family:var(--mono)"></div>
+        </div>
+
+        <!-- Progress bar -->
+        <div id="bt-progress-wrap" style="display:none;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx3);margin-bottom:5px">
+            <span id="bt-progress-msg">Probíhá...</span>
+            <span id="bt-progress-pct">0%</span>
+          </div>
+          <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden">
+            <div id="bt-progress-bar" style="height:100%;background:var(--blue);border-radius:3px;width:0%;transition:width .3s"></div>
+          </div>
+        </div>
+        <!-- Tlačítka -->
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" style="flex:1;justify-content:center;padding:13px;font-size:14px" id="bt-btn" onclick="runBacktest()">
+            ▶ Backtest
+          </button>
+          <button class="btn btn-ghost" style="flex:1;justify-content:center;padding:13px;font-size:14px;border-color:var(--purple);color:var(--purple)" id="opt-btn" onclick="openOptimizer()">
+            ⚡ Optimalizovat
+          </button>
+        </div>
+      </div>
+
+      <!-- Záložky: Backtesty / Optimalizace -->
+      <div class="card">
+        <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--b1)">
+          <button onclick="switchHistTab('bt')" id="tab-bt"
+            style="padding:8px 18px;background:var(--blue-dim);color:var(--blue);border:none;border-bottom:2px solid var(--blue);font-size:13px;font-weight:600;cursor:pointer">
+            📊 Backtesty
+          </button>
+          <button onclick="switchHistTab('opt')" id="tab-opt"
+            style="padding:8px 18px;background:transparent;color:var(--tx3);border:none;border-bottom:2px solid transparent;font-size:13px;cursor:pointer">
+            ⚡ Optimalizace
+          </button>
+        </div>
+
+        <!-- Backtest historie -->
+        <div id="hist-bt-panel">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Bot</th><th>Balance</th><th>Trades</th><th>WR</th><th>PnL</th><th>Datum</th><th></th></tr></thead>
+              <tbody id="bt-hist-tbody"></tbody>
+            </table>
+          </div>
+          <div id="bt-hist-empty" style="display:none;text-align:center;padding:30px;color:var(--tx3);font-size:13px">
+            <div style="font-size:32px;margin-bottom:10px;opacity:.4">🔬</div>Zatím žádné backtesty
+          </div>
+        </div>
+
+        <!-- Optimalizace historie -->
+        <div id="hist-opt-panel" style="display:none">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Bot</th><th>IS období</th><th>OOS období</th><th>Combos</th><th>Verdict</th><th>Datum</th><th></th></tr></thead>
+              <tbody id="opt-hist-tbody"></tbody>
+            </table>
+          </div>
+          <div id="opt-hist-empty" style="display:none;text-align:center;padding:30px;color:var(--tx3);font-size:13px">
+            <div style="font-size:32px;margin-bottom:10px;opacity:.4">⚡</div>Zatím žádné optimalizace
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: VÝSLEDKY -->
+  <div id="bt-view-results" style="display:none">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+      <button onclick="btGoBack()" class="btn btn-ghost" style="gap:6px">← Zpět</button>
+      <div>
+        <div class="page-title" id="bt-result-title">Výsledky backtestu</div>
+        <div class="page-sub" id="bt-result-sub"></div>
+      </div>
+    </div>
+
+    <!-- Profit and Loss card -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="margin-bottom:12px">
+        <div style="font-size:17px;font-weight:700">Profit and loss</div>
+        <div style="font-size:12px;color:var(--tx3)">Over time</div>
+      </div>
+      <!-- KPI row -->
+      <div style="display:flex;align-items:flex-end;gap:0;padding:14px 0;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);margin-bottom:16px;flex-wrap:wrap">
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Total PnL</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-pnl">$0</div>
+        </div>
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Account Balance</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-bal">$0</div>
+        </div>
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Win Rate</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-wr">0%</div>
+        </div>
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Total Trades</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-trades">0</div>
+        </div>
+        <!-- separator -->
+        <div style="width:1px;height:40px;background:var(--b2);margin-right:28px;align-self:center"></div>
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Max Drawdown</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--red)" id="bt-h-dd">$0</div>
+        </div>
+        <div style="padding-right:28px">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Sharpe Ratio</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-sharpe">0</div>
+        </div>
+        <div style="padding-right:0">
+          <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Recovery Factor</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700" id="bt-h-rf">0</div>
+        </div>
+      </div>
+      <div style="position:relative;height:280px"><canvas id="bt-eq-chart"></canvas></div>
+    </div>
+
+    <!-- 3 panely: RR / Profit Factor / Expectancy -->
+    <div class="g3" style="margin-bottom:14px;gap:14px">
+
+      <!-- Panel 1: Min / Avg / Max RR -->
+      <div class="card">
+        <div style="font-size:12px;color:var(--tx3);font-weight:600;margin-bottom:14px;letter-spacing:1px;text-transform:uppercase">R:R Ratio</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px">
+          <div>
+            <div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Min</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono)" id="bt-p-minrr">0</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Average</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)" id="bt-p-avgrr">0</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Max</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono)" id="bt-p-maxrr">0</div>
+          </div>
+        </div>
+        <div style="position:relative;height:44px"><canvas id="bt-rr-chart"></canvas></div>
+      </div>
+
+      <!-- Panel 2: Profit Factor -->
+      <div class="card">
+        <div style="font-size:12px;color:var(--tx3);font-weight:600;margin-bottom:14px;letter-spacing:1px;text-transform:uppercase">Profit Factor</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);margin-bottom:14px" id="bt-p-pf2">0</div>
+        <div style="height:44px;display:flex;align-items:flex-end;gap:2px" id="bt-pf-bars"></div>
+      </div>
+
+      <!-- Panel 3: Expectancy -->
+      <div class="card">
+        <div style="font-size:12px;color:var(--tx3);font-weight:600;margin-bottom:14px;letter-spacing:1px;text-transform:uppercase">Expectancy</div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);margin-bottom:10px" id="bt-p-exp">$0</div>
+        <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden">
+          <div id="bt-exp-bar-green" style="height:100%;background:var(--green);border-radius:4px;float:left;transition:width .4s"></div>
+          <div id="bt-exp-bar-red" style="height:100%;background:var(--red);border-radius:4px;float:left;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:11px;color:var(--green);font-family:var(--mono)" id="bt-exp-pos">$0</span>
+          <span style="font-size:11px;color:var(--red);font-family:var(--mono)" id="bt-exp-neg">$0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Winners & Losers -->
+    <div class="g2" style="margin-bottom:14px;gap:14px">
+      <div class="wl-card" style="border-color:#10b98130">
+        <div class="wl-title" style="color:var(--green)">✓ Winners</div>
+        <div class="wl-row"><span class="wl-label">Total winners</span><span class="wl-val" id="bt-tw" style="color:var(--green)">0</span></div>
+        <div class="wl-row"><span class="wl-label">Best win</span><span class="wl-val" id="bt-bw" style="color:var(--green)">$0</span></div>
+        <div class="wl-row"><span class="wl-label">Average win</span><span class="wl-val" id="bt-aw" style="color:var(--green)">$0</span></div>
+        <div class="wl-row"><span class="wl-label">Average duration</span><span class="wl-val" id="bt-dw">–</span></div>
+        <div class="wl-row"><span class="wl-label">Max consecutive wins</span><span class="wl-val" id="bt-mcw" style="color:var(--green)">0</span></div>
+        <div class="wl-row"><span class="wl-label">Avg consecutive wins</span><span class="wl-val" id="bt-acw">0</span></div>
+      </div>
+      <div class="wl-card" style="border-color:#ef444430">
+        <div class="wl-title" style="color:var(--red)">✗ Losers</div>
+        <div class="wl-row"><span class="wl-label">Total losers</span><span class="wl-val" id="bt-tl" style="color:var(--red)">0</span></div>
+        <div class="wl-row"><span class="wl-label">Worst loss</span><span class="wl-val" id="bt-wl" style="color:var(--red)">$0</span></div>
+        <div class="wl-row"><span class="wl-label">Average loss</span><span class="wl-val" id="bt-al" style="color:var(--red)">$0</span></div>
+        <div class="wl-row"><span class="wl-label">Average duration</span><span class="wl-val" id="bt-dl">–</span></div>
+        <div class="wl-row"><span class="wl-label">Max consecutive losses</span><span class="wl-val" id="bt-mcl" style="color:var(--red)">0</span></div>
+        <div class="wl-row"><span class="wl-label">Avg consecutive losses</span><span class="wl-val" id="bt-acl">0</span></div>
+      </div>
+    </div>
+
+    <!-- Avg trades per period -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Průměrný počet tradů</div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Per Day</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--blue)" id="bt-avg-day">0</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Per Week</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--blue)" id="bt-avg-week">0</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Per Month</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--blue)" id="bt-avg-month">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exit reasons + Sessions + Duration dist -->
+    <div class="g3" style="margin-bottom:14px;gap:14px">
+      <div class="card">
+        <div class="card-title">Důvod uzavření</div>
+        <div id="bt-exit-reasons" class="col" style="gap:10px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Winrate podle session (CET)</div>
+        <div id="bt-sessions" class="col" style="gap:14px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Délka obchodů</div>
+        <div id="bt-dur-dist" class="col" style="gap:10px"></div>
+      </div>
+    </div>
+
+    <!-- Performance by Time -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Performance by time (CET hodiny)</div>
+      <div style="position:relative;height:180px"><canvas id="bt-hour-chart"></canvas></div>
+    </div>
+
+    <!-- Performance by Day -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Performance by day</div>
+      <div style="position:relative;height:200px"><canvas id="bt-day-chart"></canvas></div>
+    </div>
+
+    <!-- Performance by Month -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Performance by month</div>
+      <div style="position:relative;height:180px"><canvas id="bt-month-chart"></canvas></div>
+    </div>
+
+    <!-- Trades tabulka -->
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;margin-bottom:12px">
+        <span style="display:flex;align-items:center;gap:8px"><span style="width:3px;height:14px;background:var(--blue);border-radius:2px;display:block"></span>Simulované trady</span>
+        <span id="bt-trades-count" style="font-size:11px;color:var(--tx3);font-family:var(--mono)"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Typ</th><th>Entry</th><th>Exit</th><th>SL</th><th>TP</th><th>PnL</th><th>Exit důvod</th><th>Entry Time</th><th>Exit Time</th></tr></thead>
+          <tbody id="bt-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="bt-pagination"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: OPTIMIZER VÝSLEDKY -->
+  <div id="bt-view-opt" style="display:none">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+      <button onclick="btGoBack()" class="btn btn-ghost" style="gap:6px">← Zpět</button>
+      <div>
+        <div class="page-title">⚡ Výsledky optimalizace</div>
+        <div class="page-sub" id="opt-result-sub"></div>
+      </div>
+    </div>
+
+    <!-- Verdict banner -->
+    <div id="opt-verdict-banner" style="padding:16px 20px;border-radius:var(--r);margin-bottom:16px;font-size:14px;font-weight:500"></div>
+
+    <!-- Nejlepší parametry + IS vs OOS porovnání -->
+    <div class="g2" style="margin-bottom:14px;gap:14px">
+      <div class="card">
+        <div class="card-title">🏆 Nejlepší parametry</div>
+        <div id="opt-best-params" style="font-family:var(--mono);font-size:13px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 In-Sample vs Out-of-Sample</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+          <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid var(--b1)">Metrika</div>
+          <div style="font-size:10px;color:var(--blue);text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid var(--b1);text-align:center">In-Sample</div>
+          <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:1px;padding:6px 0;border-bottom:1px solid var(--b1);text-align:center">Out-of-Sample</div>
+          <div id="opt-comparison"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OOS Equity křivka -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">📈 Equity křivka — Out-of-Sample verifikace</div>
+      <div style="position:relative;height:260px"><canvas id="opt-oos-chart"></canvas></div>
+    </div>
+
+    <!-- Top 10 kombinací -->
+    <div class="card">
+      <div class="card-title">🔢 Top kombinace parametrů (In-Sample)</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Skóre</th><th>Parametry</th><th>WR</th><th>Avg R:R</th><th>PF</th><th>Max DD</th><th>PnL</th><th>Trades</th></tr></thead>
+          <tbody id="opt-top-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- end #content -->
+</div><!-- end #body -->
+</div><!-- end #wrap -->
+
+<!-- ══ TOAST ════════════════════════════════════════════════════════ -->
+<!-- ══ MODAL: OPTIMIZER ════════════════════════════════════════════ -->
+<div class="overlay" id="modal-opt">
+  <div class="modal" style="width:min(1100px,95vw);max-height:92vh;overflow-x:hidden">
+    <div class="modal-hdr">
+      <span class="modal-title">⚡ Walk-Forward Optimization</span>
+      <button class="btn-x" onclick="closeModal('modal-opt')">✕</button>
+    </div>
+    <div class="modal-body" style="gap:16px">
+
+      <!-- Parametry bota -->
+      <div id="opt-params-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:12px;color:var(--tx3)">
+            Optimalizovatelné parametry detekované z kódu bota
+            (<span style="font-family:var(--mono);color:var(--blue)"># opt: min-max</span>)
+          </div>
+          <button onclick="toggleOptRangeEditor()" class="btn btn-ghost btn-sm" id="btn-edit-ranges" style="font-size:11px">
+            ✏️ Nastavit rozsahy
+          </button>
+        </div>
+
+        <!-- Zobrazení detekovaných parametrů -->
+        <div id="opt-params-list" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:14px;font-family:var(--mono);font-size:12px">
+          <span style="color:var(--tx3)">Načítám parametry...</span>
+        </div>
+
+        <!-- Editor rozsahů (skrytý) -->
+        <div id="opt-range-editor" style="display:none;margin-top:12px">
+          <div style="font-size:12px;color:var(--yellow);margin-bottom:10px;padding:8px 12px;background:#f59e0b10;border:1px solid #f59e0b30;border-radius:6px">
+            ⚡ Nastav rozsahy pro optimalizaci. Parametry s rozsahem se přidají / aktualizují v kódu bota automaticky.
+          </div>
+          <div id="opt-range-inputs" style="display:flex;flex-direction:column;gap:10px"></div>
+          <button onclick="applyOptRanges()" class="btn btn-primary btn-sm" style="margin-top:12px">
+            💾 Uložit rozsahy do kódu bota
+          </button>
+        </div>
+
+        <div style="font-size:11px;color:var(--tx3);margin-top:8px">
+          Celkem kombinací: <span id="opt-combos" style="color:var(--blue);font-weight:700">–</span>
+          <span style="margin-left:8px;color:var(--yellow)" id="opt-combos-warn"></span>
+        </div>
+      </div>
+
+      <!-- Období -->
+      <div class="g2" style="gap:14px">
+        <div class="card" style="background:var(--s2)">
+          <div class="card-title" style="color:var(--blue)">📊 In-Sample (Optimalizace)</div>
+          <div class="g2" style="gap:10px">
+            <div class="frow"><label>Od</label><input type="datetime-local" id="opt-is-from"></div>
+            <div class="frow"><label>Do</label><input type="datetime-local" id="opt-is-to"></div>
+          </div>
+          <p class="fhint" style="margin-top:8px">Na tomto období se hledají nejlepší parametry</p>
+        </div>
+        <div class="card" style="background:var(--s2)">
+          <div class="card-title" style="color:var(--green)">✅ Out-of-Sample (Verifikace)</div>
+          <div class="g2" style="gap:10px">
+            <div class="frow"><label>Od</label><input type="datetime-local" id="opt-oos-from"></div>
+            <div class="frow"><label>Do</label><input type="datetime-local" id="opt-oos-to"></div>
+          </div>
+          <p class="fhint" style="margin-top:8px">Na tomto období se ověří, zda parametry fungují</p>
+        </div>
+      </div>
+
+      <!-- Cíle optimalizace -->
+      <div class="card" style="background:var(--s2)">
+        <div class="card-title">🎯 Cíle optimalizace</div>
+        <div class="g2" style="gap:14px">
+          <div class="frow">
+            <label>Min. Winrate (%)</label>
+            <input type="number" id="opt-min-wr" placeholder="např. 55" min="0" max="100">
+          </div>
+          <div class="frow">
+            <label>Min. Avg R:R</label>
+            <input type="number" id="opt-min-rr" placeholder="např. 1.5" step="0.1" min="0">
+          </div>
+          <div class="frow">
+            <label>Max. Drawdown ($)</label>
+            <input type="number" id="opt-max-dd" placeholder="např. 1500" min="0">
+          </div>
+          <div class="frow">
+            <label>Max. kombinací</label>
+            <input type="number" id="opt-max-combos" value="500" min="10" max="2000">
+            <p class="fhint">Více = přesnější, ale pomalejší</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-ghost" onclick="closeModal('modal-opt')">Zrušit</button>
+      <button class="btn" style="background:var(--purple);color:#fff;gap:7px" id="opt-run-btn" onclick="runOptimization()">
+        ⚡ Spustit optimalizaci
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VIEW: OPTIMIZER VÝSLEDKY ═══════════════════════════════════════ -->
+
+<!-- ══ PROGRESS OVERLAY ════════════════════════════════════════ -->
+<div class="progress-overlay" id="progress-overlay">
+  <div class="progress-box">
+    <div class="progress-title" id="progress-title">⏳ Probíhá operace...</div>
+    <div class="progress-msg" id="progress-msg">Načítám data...</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar-fill"></div>
+    </div>
+    <div class="progress-pct" id="progress-pct">0%</div>
+  </div>
+</div>
+
+<div id="toasts" style="position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px"></div>
+
+<!-- ══ MODAL: PŘIDAT BOTA ═══════════════════════════════════════════ -->
+<div class="overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title" id="modal-add-title">➕ Přidat nového bota</span>
+      <button class="btn-x" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="steps">
+        <div class="step active" id="stp-1"><div class="step-num">1</div><span>Základní info</span></div>
+        <div class="step-line"></div>
+        <div class="step" id="stp-2"><div class="step-num">2</div><span>Kód strategie</span></div>
+        <div class="step-line"></div>
+        <div class="step" id="stp-3"><div class="step-num">3</div><span>Parametry</span></div>
+      </div>
+      <div id="modal-s1">
+        <div class="fgrid">
+          <div class="frow"><label>Název bota *</label><input type="text" id="add-name" placeholder="např. NQ Morning Precision"></div>
+          <div class="frow"><label>Instrument</label><input type="text" id="add-inst" placeholder="např. MNQ, MES"></div>
+        </div>
+        <div class="frow" style="margin-top:14px"><label>Popis</label><input type="text" id="add-desc" placeholder="Krátký popis strategie..."></div>
+      </div>
+      <div id="modal-s2" style="display:none">
+        <div class="frow">
+          <label>Python kód strategie</label>
+          <textarea id="add-code" rows="16" placeholder="# Vlož hotový Python script&#10;# Proměnné k doplnění označ takto:&#10;# API_KEY = 'DOPLNIT'&#10;# ACCOUNT_ID = 'DOPLNIT'"></textarea>
+          <p class="fhint">Proměnné s hodnotou <span style="color:var(--blue);font-family:var(--mono)">'DOPLNIT'</span> budou detekovány automaticky.</p>
+        </div>
+      </div>
+      <div id="modal-s3" style="display:none">
+        <div id="params-fields" class="col" style="gap:12px"></div>
+        <div id="no-params" style="display:none">
+          <div class="empty" style="padding:30px"><div class="empty-icon" style="font-size:28px">✅</div><p>Žádné parametry k doplnění.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-ghost" id="btn-back" onclick="stepNav('back')" style="display:none">← Zpět</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-add')">Zrušit</button>
+      <button class="btn btn-primary" id="btn-next" onclick="stepNav('next')">Pokračovat →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: EDITACE ═══════════════════════════════════════════════ -->
+<div class="overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">✏️ Upravit bota</span>
+      <button class="btn-x" onclick="closeModal('modal-edit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="frow"><label>Název</label><input type="text" id="ed-name"></div>
+        <div class="frow"><label>Instrument</label><input type="text" id="ed-inst"></div>
+      </div>
+      <div class="frow" style="margin-top:2px"><label>Popis</label><input type="text" id="ed-desc"></div>
+      <div class="frow"><label>Kód strategie</label><textarea id="ed-code" rows="16"></textarea></div>
+      <div id="ed-params-section" style="margin-top:12px;display:none">
+        <div style="font-size:12px;color:var(--tx3);margin-bottom:8px">Parametry (API klíče apod.)</div>
+        <div id="ed-params-fields" class="fgrid"></div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Zrušit</button>
+      <button class="btn btn-primary" onclick="saveEdit()">💾 Uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: LOGY ══════════════════════════════════════════════════ -->
+<div class="overlay" id="modal-logs">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title" id="logs-title">📜 Logy</span>
+      <button class="btn-x" onclick="closeModal('modal-logs')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="terminal" id="logs-term"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ STATE ════════════════════════════════════════════════════════
+let allBots    = [];
+let modalStep  = 1;
+let editBotId  = null;
+let csvContent = null;
+let btTrades   = [];
+let tlTrades   = [];
+let btPage     = 1;
+let tlPage     = 1;
+const PAGE_SZ  = 50;
+let btEqChart  = null;
+let eqChart    = null;
+let logEs      = null;
+
+// ═══ INIT ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  startClock();
+  loadBots();
+  setInterval(loadBots, 5000);
+  setInterval(loadTrades, 15000);
+  setInterval(loadStats, 30000);
+  setupDragDrop();
+});
+
+function startClock() {
+  setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('cs-CZ');
+  }, 1000);
+}
+
+// ═══ NAVIGATE ════════════════════════════════════════════════════
+function navigate(page, el) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.querySelectorAll('[id^="page-"]').forEach(p => { p.style.display = 'none'; });
+  const pg = document.getElementById('page-' + page);
+  if (pg) { pg.style.display = 'block'; void pg.offsetWidth; pg.classList.add('fade-up'); }
+  if (page === 'tradelog') loadTrades();
+  if (page === 'stats')    loadStats();
+  if (page === 'backtest') { populateBtBots(); loadBtHistory(); }
+}
+
+// ═══ LOAD BOTS ════════════════════════════════════════════════════
+async function loadBots() {
+  const res = await fetch('/api/bots');
+  allBots = await res.json();
+
+  document.getElementById('badge-bots').textContent = allBots.length;
+
+  const running = allBots.filter(b => b.status === 'running');
+  const dot = document.getElementById('run-dot');
+  const txt = document.getElementById('run-txt');
+  dot.className = 'pulse ' + (running.length ? 'on' : 'off');
+  txt.textContent = running.length ? `${running.length} bot${running.length > 1 ? 'i' : ''} běží` : 'Žádný bot neběží';
+
+  renderBots();
+  renderSbBots();
+  populateTlFilter();
+  populateBtBots();
+}
+
+function renderBots() {
+  const el = document.getElementById('bots-grid');
+  if (!allBots.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🤖</div><p>Zatím žádní boti.<br>Klikni na <strong>＋ Přidat bota</strong>.</p></div>`;
+    return;
+  }
+  el.innerHTML = allBots.map(b => `
+    <div class="card" style="transition:border .15s" onmouseenter="this.style.borderColor='var(--b2)'" onmouseleave="this.style.borderColor='var(--b1)'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:var(--tx);margin-bottom:5px;display:flex;align-items:center;gap:8px">
+            ${esc(b.name)}
+            <span class="badge ${b.status==='running'?'badge-green':'badge-grey'}" style="font-size:9px">
+              ${b.status==='running'?'● BĚŽÍ':'○ STOP'}
+            </span>
+          </div>
+          <div style="font-size:12px;color:var(--tx3)">${esc(b.description||'')}</div>
+        </div>
+        <span class="badge badge-blue" style="margin-left:12px;flex-shrink:0">${esc(b.instrument||'N/A')}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${b.status==='running'
+          ? `<button class="btn btn-sm btn-stop" onclick="stopBot('${b.id}')">⬛ Zastavit</button>`
+          : `<button class="btn btn-sm btn-run" onclick="startBot('${b.id}')">▶ Spustit</button>`}
+        <button class="btn btn-sm btn-ghost" onclick="openLogs('${b.id}','${esc(b.name)}')">📜 Logy</button>
+        <button class="btn btn-sm btn-ghost" onclick="openEdit('${b.id}')">✏️ Upravit</button>
+        <button class="btn btn-sm btn-ghost" style="color:var(--red);border-color:var(--red)33" onclick="deleteBot('${b.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderSbBots() {
+  const el = document.getElementById('sb-bots');
+  el.innerHTML = allBots.map(b => `
+    <div class="sb-bot">
+      <div class="sb-bot-name">${esc(b.name)}</div>
+      <div class="sb-bot-row">
+        <span class="sb-bot-inst">${esc(b.instrument||'')}</span>
+        <span class="badge ${b.status==='running'?'badge-green':'badge-grey'}" style="font-size:9px">${b.status==='running'?'●':'○'}</span>
+      </div>
+    </div>`).join('') || '<div style="padding:8px 12px;font-size:12px;color:var(--tx3)">Žádní boti</div>';
+}
+
+// ═══ START / STOP ══════════════════════════════════════════════
+async function startBot(id) {
+  const btn = document.querySelector(`[onclick="startBot('${id}')"]`);
+  if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+  try {
+    const res  = await fetch(`/api/bots/${id}/start`, {method:'POST'});
+    const data = await res.json();
+    if (data.error) toast('❌ ' + data.error, 'error');
+    else toast(`🚀 Bot spuštěn (PID ${data.pid||'?'})`, 'success');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+  await loadBots();
+}
+
+async function stopBot(id) {
+  const btn = document.querySelector(`[onclick="stopBot('${id}')"]`);
+  if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+  await fetch(`/api/bots/${id}/stop`, {method:'POST'});
+  toast('🛑 Bot zastaven', 'warn');
+  await loadBots();
+}
+
+async function deleteBot(id) {
+  if (!confirm('Smazat bota? Smaže se i jeho historie tradů.')) return;
+  await fetch(`/api/bots/${id}`, {method:'DELETE'});
+  toast('🗑 Bot smazán', 'warn');
+  await loadBots();
+}
+
+// ═══ MODAL: PŘIDAT ════════════════════════════════════════════
+function openAddBot() {
+  editBotId = null; modalStep = 1;
+  document.getElementById('modal-add-title').textContent = '➕ Přidat nového bota';
+  ['add-name','add-inst','add-desc','add-code'].forEach(id => document.getElementById(id).value = '');
+  updateStep();
+  document.getElementById('modal-add').classList.add('show');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+  if (logEs) { logEs.close(); logEs = null; }
+}
+
+function updateStep() {
+  [1,2,3].forEach(i => {
+    document.getElementById(`modal-s${i}`).style.display = i===modalStep ? 'block' : 'none';
+    const s = document.getElementById(`stp-${i}`);
+    s.className = 'step' + (i<modalStep?' done':i===modalStep?' active':'');
+  });
+  document.getElementById('btn-back').style.display = modalStep>1 ? 'inline-flex' : 'none';
+  document.getElementById('btn-next').textContent = modalStep===3 ? '💾 Uložit bota' : 'Pokračovat →';
+}
+
+async function stepNav(dir) {
+  if (dir === 'next') {
+    if (modalStep === 1) {
+      if (!document.getElementById('add-name').value.trim()) { toast('Zadej název bota!','error'); return; }
+      modalStep = 2; updateStep();
+    } else if (modalStep === 2) {
+      const code = document.getElementById('add-code').value;
+      const res  = await fetch('/api/bots/scan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+      const data = await res.json();
+      renderParamFields(data.fields||[]);
+      modalStep = 3; updateStep();
+    } else {
+      await saveNewBot();
+    }
+  } else {
+    modalStep = Math.max(1, modalStep-1); updateStep();
+  }
+}
+
+function renderParamFields(fields) {
+  const c = document.getElementById('params-fields');
+  const n = document.getElementById('no-params');
+  if (!fields.length) { c.innerHTML=''; n.style.display='block'; return; }
+  n.style.display = 'none';
+  c.innerHTML = `
+    <p style="font-size:12px;color:var(--tx3)">Aplikace detekovala tyto parametry. Vyplň hodnoty:</p>
+    <div class="fgrid">${fields.map(f=>`
+      <div class="frow">
+        <label>${esc(f.label)}</label>
+        <input type="text" id="p-${f.key}" data-key="${f.key}" placeholder="Vlož hodnotu...">
+      </div>`).join('')}
+    </div>`;
+}
+
+async function saveNewBot() {
+  const params = {};
+  document.querySelectorAll('#params-fields input[data-key]').forEach(el => { params[el.dataset.key] = el.value; });
+  await fetch('/api/bots', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name:        document.getElementById('add-name').value.trim(),
+      instrument:  document.getElementById('add-inst').value.trim(),
+      description: document.getElementById('add-desc').value.trim(),
+      code:        document.getElementById('add-code').value,
+      params,
+    })
+  });
+  closeModal('modal-add');
+  toast('✅ Bot přidán','success');
+  await loadBots();
+}
+
+// ═══ MODAL: EDIT ══════════════════════════════════════════════
+async function openEdit(id) {
+  const res = await fetch(`/api/bots/${id}`);
+  const b   = await res.json();
+  editBotId = id;
+  document.getElementById('ed-name').value = b.name;
+  document.getElementById('ed-inst').value = b.instrument||'';
+  document.getElementById('ed-desc').value = b.description||'';
+  document.getElementById('ed-code').value = b.code||'';
+  const params = b.params || {};
+  // Placeholders from code OR reconstruct from stored params keys
+  let fields = b.placeholders || [];
+  if (!fields.length && Object.keys(params).length) {
+    fields = Object.keys(params).map(k => ({key: k, label: k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}));
+  }
+  const sec = document.getElementById('ed-params-section');
+  const c   = document.getElementById('ed-params-fields');
+  if (fields.length) {
+    c.innerHTML = fields.map(f => `
+      <div class="frow">
+        <label>${esc(f.label)}</label>
+        <input type="text" data-key="${f.key}" value="${esc(params[f.key]||'')}" placeholder="Vlož hodnotu...">
+      </div>`).join('');
+    sec.style.display = 'block';
+  } else {
+    c.innerHTML = '';
+    sec.style.display = 'none';
+  }
+  document.getElementById('modal-edit').classList.add('show');
+}
+
+async function saveEdit() {
+  const params = {};
+  document.querySelectorAll('#ed-params-fields input[data-key]').forEach(el => { params[el.dataset.key] = el.value; });
+  await fetch(`/api/bots/${editBotId}`, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name: document.getElementById('ed-name').value,
+      instrument: document.getElementById('ed-inst').value,
+      description: document.getElementById('ed-desc').value,
+      code: document.getElementById('ed-code').value,
+      params,
+    })
+  });
+  closeModal('modal-edit');
+  toast('✅ Bot uložen','success');
+  await loadBots();
+}
+
+// ═══ LOGY ════════════════════════════════════════════════════
+function openLogs(id, name) {
+  document.getElementById('logs-title').textContent = `📜 Logy — ${name}`;
+  const term = document.getElementById('logs-term');
+  term.innerHTML = '';
+  document.getElementById('modal-logs').classList.add('show');
+  fetch(`/api/bots/${id}/logs`).then(r=>r.json()).then(d => d.lines.forEach(l=>addLog(term,l)));
+  if (logEs) logEs.close();
+  logEs = new EventSource(`/api/bots/${id}/logs/stream`);
+  logEs.onmessage = e => addLog(term, JSON.parse(e.data));
+}
+
+function addLog(term, line) {
+  const d = document.createElement('div');
+  let col = '#4ade80';
+  if (line.includes('🛑')||line.includes('ERROR')) col='#f87171';
+  else if (line.includes('⚠️')||line.includes('WARN')) col='#fbbf24';
+  const ts  = (line.match(/\[\d+:\d+:\d+\]/)||[''])[0];
+  const msg = esc(line.replace(/\[\d+:\d+:\d+\]\s*/,''));
+  d.innerHTML = `<span style="color:var(--tx3)">${ts}</span> <span style="color:${col}">${msg}</span>`;
+  term.appendChild(d);
+  term.scrollTop = term.scrollHeight;
+}
+
+// ═══ TRADE LOG ════════════════════════════════════════════════
+function populateTlFilter() {
+  const sel = document.getElementById('tl-bot');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">Všichni boti</option>' +
+    allBots.map(b=>`<option value="${b.id}" ${b.id===cur?'selected':''}>${esc(b.name)}</option>`).join('');
+}
+
+async function loadTrades() {
+  const bot = document.getElementById('tl-bot')?.value;
+  const per = document.getElementById('tl-period')?.value;
+  const p   = new URLSearchParams();
+  if (bot && bot!=='all') p.set('bot_id',bot);
+  if (per) p.set('period',per);
+  const res = await fetch('/api/trades?'+p);
+  tlTrades  = await res.json();
+  tlPage    = 1;
+  renderTrades();
+}
+
+function renderTrades() {
+  const tbody = document.getElementById('tl-tbody');
+  const empty = document.getElementById('tl-empty');
+  const count = document.getElementById('tl-count');
+  if (!tlTrades.length) { tbody.innerHTML=''; empty.style.display='block'; count.textContent=''; renderPagination('tl-pagination',0,0,null); return; }
+  empty.style.display = 'none';
+  count.textContent   = `${tlTrades.length} záznamů`;
+  const start = (tlPage-1)*PAGE_SZ, end = start+PAGE_SZ;
+  const page  = tlTrades.slice(start,end);
+  tbody.innerHTML = page.map(t => {
+    const pos = (t.pnl||0)>=0;
+    return `<tr>
+      <td><span class="badge badge-blue">${esc(t.bot_name)}</span></td>
+      <td class="td-m">${esc(t.instrument)}</td>
+      <td><span class="badge ${t.direction==='BUY'?'badge-green':'badge-red'}">${t.direction}</span></td>
+      <td class="td-m">${t.contracts}</td>
+      <td class="td-m">${t.entry??'–'}</td>
+      <td class="td-m">${t.exit_price??'–'}</td>
+      <td class="td-m" style="color:var(--red)">${t.sl??'–'}</td>
+      <td class="td-m" style="color:var(--blue)">${t.tp??'–'}</td>
+      <td class="${pos?'td-pos':'td-neg'}">${pos?'+':''}$${(t.pnl||0).toFixed(2)}</td>
+      <td class="td-m" style="font-size:11px">${(t.entry_time||'').slice(0,16)}</td>
+      <td class="td-m" style="font-size:11px">${(t.exit_time||'').slice(0,16)}</td>
+    </tr>`;
+  }).join('');
+  renderPagination('tl-pagination', tlPage, Math.ceil(tlTrades.length/PAGE_SZ), p => { tlPage=p; renderTrades(); });
+}
+
+// ═══ STATISTIKY ═══════════════════════════════════════════════
+async function loadStats() {
+  const per = document.getElementById('stats-period')?.value||'';
+  const res = await fetch('/api/stats'+(per?`?period=${per}`:''));
+  const d   = await res.json();
+  const tot = d.totals||{};
+  const pnl = tot.total_pnl||0;
+  const pnlEl = document.getElementById('st-pnl');
+  pnlEl.textContent = `${pnl>=0?'+':''}$${pnl.toFixed(2)}`;
+  pnlEl.style.color = pnl>=0?'var(--green)':'var(--red)';
+  document.getElementById('st-wr').textContent    = `${tot.winrate||0}%`;
+  document.getElementById('st-trades').textContent = tot.total_trades||0;
+  document.getElementById('st-active').textContent = allBots.filter(b=>b.status==='running').length;
+  const tbody = document.getElementById('st-tbody');
+  const empty = document.getElementById('st-empty');
+  if (!d.bots?.length) { tbody.innerHTML=''; empty.style.display='block'; }
+  else {
+    empty.style.display='none';
+    tbody.innerHTML = d.bots.map(b => {
+      const pos=(b.total_pnl||0)>=0;
+      return `<tr>
+        <td><strong>${esc(b.bot_name)}</strong></td>
+        <td><span class="badge badge-blue">${esc(b.instrument||'')}</span></td>
+        <td class="td-m">${b.total_trades}</td>
+        <td class="td-m">${b.winrate}%</td>
+        <td class="td-m">${b.avg_rr}</td>
+        <td class="td-m">${b.avg_duration} min</td>
+        <td class="${pos?'td-pos':'td-neg'}">${pos?'+':''}$${b.total_pnl.toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderEqChart(d.equity||[]);
+}
+
+function renderEqChart(eq) {
+  const ctx = document.getElementById('eq-chart');
+  if (!ctx) return;
+  if (eqChart) eqChart.destroy();
+  eqChart = new Chart(ctx, {
+    type:'line',
+    data:{labels:eq.map(e=>e.time),datasets:[{
+      data:eq.map(e=>e.value),
+      borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.08)',
+      borderWidth:2,fill:true,tension:.3,pointRadius:0,pointHoverRadius:4,
+    }]},
+    options:chartOpts('$')
+  });
+}
+
+// ═══ BACKTEST ═════════════════════════════════════════════════
+let btRrChart   = null;
+let _btLastData = null;
+
+function populateBtBots() {
+  const sel = document.getElementById('bt-bot');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— vyber bota —</option>' +
+    allBots.map(b=>`<option value="${b.id}" ${b.id===cur?'selected':''}>${esc(b.name)}</option>`).join('');
+}
+
+function setupDragDrop() {
+  const dz = document.getElementById('dz');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) { const inp=document.getElementById('csv-inp'); const dt=new DataTransfer(); dt.items.add(f); inp.files=dt.files; handleCsv(inp); }
+  });
+}
+
+let csvServerId = null;
+
+async function handleCsv(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const dz   = document.getElementById('dz-txt');
+  const info = document.getElementById('csv-info');
+
+  dz.textContent       = `⏳ Nahrávám ${f.name}...`;
+  info.style.display   = 'block';
+  info.style.color     = 'var(--tx3)';
+  info.textContent     = 'Odesílám soubor na server...';
+
+  // Použij FormData - soubor se pošle přímo, NEČTE se do paměti prohlížeče
+  try {
+    const fd = new FormData();
+    fd.append('file', f);
+    const res  = await fetch('/api/csv/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.csv_id) {
+      csvServerId  = data.csv_id;
+      csvContent   = null;  // Nepotřebujeme v paměti
+      dz.textContent     = `✅ ${f.name}`;
+      info.style.color   = 'var(--green)';
+      info.textContent   = `✓ ${(data.rows||0).toLocaleString()} svíček uloženo`;
+    } else {
+      throw new Error(data.error || 'Upload selhal');
+    }
+  } catch(err) {
+    dz.textContent     = `❌ ${f.name} — chyba uploadu`;
+    info.style.color   = 'var(--red)';
+    info.textContent   = err.message;
+    csvServerId = null;
+  }
+}
+
+function btGoBack() {
+  document.getElementById('bt-view-results').style.display = 'none';
+  document.getElementById('bt-view-opt').style.display     = 'none';
+  document.getElementById('bt-view-form').style.display    = 'block';
+}
+
+async function runBacktest() {
+  const botId = document.getElementById('bt-bot').value;
+  if (!botId)                      { toast('Vyber bota!','error'); return; }
+  if (!csvServerId && !csvContent) { toast('Nahraj CSV soubor!','error'); return; }
+  const btn = document.getElementById('bt-btn');
+  btn.textContent = '⏳ Backtest...'; btn.disabled = true;
+  showProgress('📊 Probíhá backtest...');
+  const fakeIv = fakeProgress(8000);
+  try {
+    const balance = parseFloat(document.getElementById('bt-balance').value||'50000');
+    const res  = await fetch('/api/backtest/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        bot_id:       botId,
+        csv_id:       csvServerId || null,
+        csv:          (csvServerId || !csvContent) ? '' : csvContent,
+        period_from:  document.getElementById('bt-from').value,
+        period_to:    document.getElementById('bt-to').value,
+        timeframe:    parseInt(document.getElementById('bt-tf').value||'1'),
+        start_balance:balance,
+      })
+    });
+    const data = await res.json();
+    if (!data.success) { toast('❌ '+data.error,'error'); return; }
+    _btLastData = data;
+    _btLastData._startBalance = balance;
+    renderBtResults(data, balance);
+    document.getElementById('bt-view-form').style.display    = 'none';
+    document.getElementById('bt-view-results').style.display = 'block';
+    toast(`✅ Hotovo za ${data.elapsed_sec}s · ${(data.bars_total||0).toLocaleString()} svíček`, 'success');
+    loadBtHistory();
+  } catch(e) { toast('❌ '+e.message,'error'); }
+  finally {
+    clearInterval(fakeIv);
+    updateProgress(100, 'Hotovo!');
+    setTimeout(hideProgress, 500);
+    btn.textContent='▶ Backtest'; btn.disabled=false;
+  }
+}
+
+function renderBtResults(data, startBalance) {
+  const s  = data.stats;
+  const sb = startBalance || 50000;
+
+  // Subtitle
+  const bot = allBots.find(b => b.id === document.getElementById('bt-bot')?.value);
+  document.getElementById('bt-result-title').textContent =
+    bot ? `${bot.name} — Výsledky` : 'Výsledky backtestu';
+  document.getElementById('bt-result-sub').textContent =
+    `${(data.bars_total||0).toLocaleString()} svíček · ${data.timeframe || '?'}min TF · ${data.elapsed_sec || '?'}s`;
+
+  // KPI row
+  const pnlPos = s.total_pnl >= 0;
+  const fmt = v => `${v>=0?'+':''}$${Math.abs(v).toFixed(2)}`;
+
+  const pnlEl = document.getElementById('bt-h-pnl');
+  pnlEl.textContent = fmt(s.total_pnl);
+  pnlEl.style.color = pnlPos ? 'var(--green)' : 'var(--red)';
+
+  const finalBal = sb + s.total_pnl;
+  const balEl = document.getElementById('bt-h-bal');
+  balEl.textContent = `$${finalBal.toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  balEl.style.color = finalBal >= sb ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('bt-h-wr').textContent  = `${s.winrate}%`;
+  document.getElementById('bt-h-trades').textContent = s.total_trades;
+  document.getElementById('bt-h-dd').textContent  = `-$${s.max_dd.toFixed(2)}`;
+
+  const sharpeEl = document.getElementById('bt-h-sharpe');
+  sharpeEl.textContent = s.sharpe_ratio;
+  sharpeEl.style.color = s.sharpe_ratio >= 1 ? 'var(--green)' : s.sharpe_ratio >= 0 ? 'var(--tx)' : 'var(--red)';
+
+  const rfEl = document.getElementById('bt-h-rf');
+  rfEl.textContent = s.recovery_factor;
+  rfEl.style.color = s.recovery_factor >= 2 ? 'var(--green)' : s.recovery_factor >= 0 ? 'var(--tx)' : 'var(--red)';
+
+  // Avg trades
+  const adEl = document.getElementById('bt-avg-day');
+  const awEl = document.getElementById('bt-avg-week');
+  const amEl = document.getElementById('bt-avg-month');
+  if (adEl) adEl.textContent = s.avg_trades_day  || '–';
+  if (awEl) awEl.textContent = s.avg_trades_week || '–';
+  if (amEl) amEl.textContent = s.avg_trades_month|| '–';
+
+  // RR panely
+  document.getElementById('bt-p-avgrr').textContent = s.avg_rr_trades || s.avg_rr || '–';
+  document.getElementById('bt-p-maxrr').textContent = s.max_rr ?? '–';
+  document.getElementById('bt-p-minrr').textContent = s.min_rr ?? '–';
+  document.getElementById('bt-p-pf2').textContent   = s.profit_factor;
+
+  // Expectancy panel
+  const expEl2 = document.getElementById('bt-p-exp');
+  if (expEl2) {
+    expEl2.textContent = fmt(s.expectancy);
+    expEl2.style.color = s.expectancy >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  // Expectancy bar
+  const avgW = Math.abs(s.avg_win || 0), avgL = Math.abs(s.avg_loss || 0);
+  const tot  = avgW + avgL || 1;
+  document.getElementById('bt-exp-bar-green').style.width = Math.round(avgW/tot*100) + '%';
+  document.getElementById('bt-exp-bar-red').style.width   = Math.round(avgL/tot*100) + '%';
+  document.getElementById('bt-exp-pos').textContent = `+$${s.avg_win}`;
+  document.getElementById('bt-exp-neg').textContent = `-$${s.avg_loss}`;
+
+  // PF bars dekorace
+  const pfBars = document.getElementById('bt-pf-bars');
+  if (pfBars) {
+    pfBars.innerHTML = Array.from({length:18}, (_,i) => {
+      const h = 8 + Math.random() * 30;
+      const col = Math.random() > 0.38 ? 'var(--blue)' : 'var(--b2)';
+      return `<div style="flex:1;height:${h}px;background:${col};border-radius:2px"></div>`;
+    }).join('');
+  }
+
+  // Winners
+  document.getElementById('bt-tw').textContent  = s.total_wins;
+  document.getElementById('bt-bw').textContent  = `+$${s.best_win}`;
+  document.getElementById('bt-aw').textContent  = `+$${s.avg_win}`;
+  document.getElementById('bt-dw').textContent  = s.avg_duration_win || '–';
+  document.getElementById('bt-mcw').textContent = s.max_consec_wins;
+  document.getElementById('bt-acw').textContent = s.avg_consec_wins;
+
+  // Losers
+  document.getElementById('bt-tl').textContent  = s.total_losses;
+  document.getElementById('bt-wl').textContent  = `$${s.worst_loss}`;
+  document.getElementById('bt-al').textContent  = `-$${s.avg_loss}`;
+  document.getElementById('bt-dl').textContent  = s.avg_duration_loss || '–';
+  document.getElementById('bt-mcl').textContent = s.max_consec_losses;
+  document.getElementById('bt-acl').textContent = s.avg_consec_losses;
+
+  // Exit reasons
+  const erEl = document.getElementById('bt-exit-reasons');
+  if (erEl && s.exit_pct) {
+    erEl.innerHTML = Object.entries(s.exit_pct)
+      .sort((a,b) => b[1]-a[1])
+      .map(([reason, pct]) => {
+        const col = reason==='TP'?'var(--green)':reason==='SL'?'var(--red)':'var(--yellow)';
+        const cnt = s.exit_reasons?.[reason] || 0;
+        return `<div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <span style="font-size:12px;font-weight:600;color:${col}">${reason}</span>
+            <span style="font-family:var(--mono);font-size:12px">${pct}% <span style="color:var(--tx3)">(${cnt})</span></span>
+          </div>
+          <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${col};border-radius:3px;transition:width .5s"></div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  // Sessions
+  const sessEl = document.getElementById('bt-sessions');
+  if (sessEl && s.session_stats) {
+    const sessColors = { Asia:'var(--purple)', London:'var(--blue)', NY:'var(--green)' };
+    sessEl.innerHTML = Object.entries(s.session_stats).map(([name, ss]) => {
+      const col = sessColors[name] || 'var(--blue)';
+      return `<div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <div>
+            <span style="font-size:13px;font-weight:600;color:${col}">${name}</span>
+            <span style="font-size:10px;color:var(--tx3);margin-left:6px">${ss.hours}</span>
+          </div>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:${col}">${ss.winrate}%</span>
+        </div>
+        <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${ss.winrate}%;background:${col};border-radius:3px;transition:width .5s"></div>
+        </div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:3px">${ss.total} tradů · PnL: $${ss.pnl.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Duration distribution
+  const durEl = document.getElementById('bt-dur-dist');
+  if (durEl && s.duration_dist) {
+    const maxPct = Math.max(...Object.values(s.duration_dist).map(d=>d.pct), 1);
+    durEl.innerHTML = Object.entries(s.duration_dist).map(([label, d]) => `
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:12px;font-weight:600">${label}</span>
+          <span style="font-family:var(--mono);font-size:12px">${d.pct}% <span style="color:var(--tx3)">(${d.count})</span></span>
+        </div>
+        <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${Math.round(d.pct/maxPct*100)}%;background:var(--blue);border-radius:3px;transition:width .5s"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Equity chart
+  const eq   = (data.equity||[]).map(e=>({...e, value: e.value + sb}));
+  const step = Math.max(1, Math.floor(eq.length/500));
+  renderBtEqChart(eq.filter((_,i)=>i%step===0||i===eq.length-1), sb);
+
+  // Performance charts
+  renderHourChart(s.perf_by_hour || []);
+  renderDayChart(s.perf_by_day   || []);
+  renderMonthChart(s.perf_by_month || []);
+  renderRrChart(data.trades || []);
+
+  // Trades
+  btTrades = data.trades || [];
+  btPage   = 1;
+  renderBtTrades();
+}
+
+function renderRrChart(trades) {
+  const ctx = document.getElementById('bt-rr-chart');
+  if (!ctx) return;
+  if (btRrChart) btRrChart.destroy();
+  const rrs = trades.map(t => {
+    const risk = Math.abs(t.entry - t.sl);
+    const rew  = Math.abs(t.pnl) / 2;
+    return risk > 0 ? parseFloat((rew/risk).toFixed(2)) : 0;
+  }).slice(-40);
+  btRrChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: rrs.map((_,i)=>i),
+      datasets:[{
+        data: rrs,
+        backgroundColor: rrs.map(v=>v>1?'rgba(59,130,246,0.7)':'rgba(59,130,246,0.25)'),
+        borderRadius:2, borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}}
+    }
+  });
+}
+
+function renderHourChart(data) {
+  const ctx = document.getElementById('bt-hour-chart');
+  if (!ctx) return;
+  if (window._btHourChart) window._btHourChart.destroy();
+  const labels = data.map(d => d.label);
+  const pnls   = data.map(d => d.pnl);
+  const wrs    = data.map(d => d.winrate);
+  window._btHourChart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', data: pnls, backgroundColor: pnls.map(v=>v>=0?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.7)'),
+          borderRadius:3, yAxisID:'y', label:'PnL' },
+        { type:'line', data: wrs, borderColor:'#3b82f6', borderWidth:2,
+          pointRadius:3, pointBackgroundColor:'#3b82f6', yAxisID:'y2', label:'WR%', tension:.3 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1c2333',titleColor:'#94a3b8',bodyColor:'#e2e8f0',
+        callbacks:{label:c=>c.dataset.label==='WR%'?`WR: ${c.parsed.y}%`:`PnL: $${c.parsed.y.toFixed(2)}`}
+      }},
+      scales:{
+        x:{ticks:{color:'#7a90a8',font:{size:10,family:'JetBrains Mono'}},grid:{color:'#2a365033'}},
+        y:{ticks:{color:'#7a90a8',font:{size:10},callback:v=>`$${v}`},grid:{color:'#2a365055'},position:'left'},
+        y2:{ticks:{color:'#3b82f6',font:{size:10},callback:v=>`${v}%`},grid:{display:false},position:'right',min:0,max:100}
+      }
+    }
+  });
+}
+
+function renderDayChart(data) {
+  const ctx = document.getElementById('bt-day-chart');
+  if (!ctx) return;
+  if (window._btDayChart) window._btDayChart.destroy();
+  window._btDayChart = new Chart(ctx, {
+    data: {
+      labels: data.map(d=>d.label),
+      datasets: [
+        { type:'bar', data: data.map(d=>d.pnl),
+          backgroundColor: data.map(d=>d.pnl>=0?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.7)'),
+          borderRadius:4, yAxisID:'y', label:'PnL' },
+        { type:'line', data: data.map(d=>d.winrate), borderColor:'#3b82f6',
+          borderWidth:2, pointRadius:4, pointBackgroundColor:'#3b82f6',
+          yAxisID:'y2', label:'WR%', tension:.3 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1c2333',titleColor:'#94a3b8',bodyColor:'#e2e8f0',
+        callbacks:{label:c=>c.dataset.label==='WR%'?`WR: ${c.parsed.y}%`:`PnL: $${c.parsed.y.toFixed(2)}`}
+      }},
+      scales:{
+        x:{ticks:{color:'#7a90a8',font:{size:11,family:'JetBrains Mono'}},grid:{color:'#2a365033'}},
+        y:{ticks:{color:'#7a90a8',font:{size:10},callback:v=>`$${v}`},grid:{color:'#2a365055'},position:'left'},
+        y2:{ticks:{color:'#3b82f6',font:{size:10},callback:v=>`${v}%`},grid:{display:false},position:'right',min:0,max:100}
+      }
+    }
+  });
+}
+
+function renderMonthChart(data) {
+  const ctx = document.getElementById('bt-month-chart');
+  if (!ctx) return;
+  if (window._btMonthChart) window._btMonthChart.destroy();
+  const active = data.filter(d=>d.total>0);
+  window._btMonthChart = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels: active.map(d=>d.label),
+      datasets:[{
+        data: active.map(d=>d.pnl),
+        backgroundColor: active.map(d=>d.pnl>=0?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.7)'),
+        borderRadius:4,
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1c2333',bodyColor:'#e2e8f0',
+        callbacks:{
+          label:c=>`PnL: $${c.parsed.y.toFixed(2)}`,
+          afterLabel:c=>`WR: ${active[c.dataIndex]?.winrate}% · ${active[c.dataIndex]?.total} tradů`
+        }
+      }},
+      scales:{
+        x:{ticks:{color:'#7a90a8',font:{size:11,family:'JetBrains Mono'}},grid:{display:false}},
+        y:{ticks:{color:'#7a90a8',font:{size:10},callback:v=>`$${v}`},grid:{color:'#2a365055'}}
+      }
+    }
+  });
+}
+
+
+function renderBtEqChart(eq, startBalance) {
+  const ctx = document.getElementById('bt-eq-chart');
+  if (!ctx) return;
+  if (btEqChart) btEqChart.destroy();
+
+  // Gradient fill
+  const gradient = ctx.getContext('2d').createLinearGradient(0,0,0,260);
+  gradient.addColorStop(0,   'rgba(59,130,246,0.35)');
+  gradient.addColorStop(0.6, 'rgba(59,130,246,0.08)');
+  gradient.addColorStop(1,   'rgba(59,130,246,0.0)');
+
+  btEqChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: eq.map(e=>e.time||`#${e.trade}`),
+      datasets:[{
+        data:eq.map(e=>e.value),
+        borderColor:'#3b82f6',
+        backgroundColor:gradient,
+        borderWidth:2,fill:true,tension:.35,
+        pointRadius:eq.length<100?3:0,
+        pointHoverRadius:5,
+        pointBackgroundColor:'#fff',
+        pointBorderColor:'#3b82f6',
+        pointBorderWidth:2,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:600,easing:'easeInOutQuart'},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1c2333',borderColor:'#3b82f640',borderWidth:1,
+          titleColor:'#94a3b8',bodyColor:'#e2e8f0',padding:10,
+          callbacks:{
+            label: ctx => `Balance: $${ctx.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
+          }
+        }
+      },
+      scales:{
+        x:{
+          ticks:{color:'#7a90a8',font:{family:'JetBrains Mono',size:10},maxTicksLimit:8},
+          grid:{color:'#1c233300'},
+        },
+        y:{
+          ticks:{color:'#7a90a8',font:{family:'JetBrains Mono',size:10},callback:v=>`$${(v/1000).toFixed(0)}k`},
+          grid:{color:'#2a365055'},
+        }
+      }
+    }
+  });
+}
+
+async function loadBtHistory() {
+  const res  = await fetch('/api/backtest/history');
+  const hist = await res.json();
+  const tbody = document.getElementById('bt-hist-tbody');
+  const empty = document.getElementById('bt-hist-empty');
+  if (!hist.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = hist.map(h => {
+    const pos = (h.total_pnl||0)>=0;
+    return `<tr style="cursor:pointer" onclick="loadHistDetail(${h.id})">
+      <td><span class="badge badge-blue">${esc(h.bot_name)}</span></td>
+      <td class="td-m">–</td>
+      <td class="td-m">$${(h.starting_balance||50000).toLocaleString()}</td>
+      <td class="td-m">${h.total_trades}</td>
+      <td class="td-m">${h.winrate}%</td>
+      <td class="${pos?'td-pos':'td-neg'}">${pos?'+':''}$${(h.total_pnl||0).toFixed(2)}</td>
+      <td class="td-m" style="font-size:11px">${(h.created_at||'').slice(0,16)}</td>
+      <td>
+        <button class="btn btn-sm btn-ghost" style="color:var(--red);border-color:var(--red)22;padding:3px 8px"
+          onclick="event.stopPropagation();deleteBtHistory(${h.id})">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadHistDetail(id) {
+  const res  = await fetch(`/api/backtest/${id}`);
+  const data = await res.json();
+  if (!data.trades) return;
+  const sb = data.starting_balance || 50000;
+  data.equity = data.equity || [];
+  data.style_info = {style:'saved'};
+  data.elapsed_sec = '–';
+  data.bars_total = data.trades.length;
+  renderBtResults(data, sb);
+  document.getElementById('bt-view-form').style.display    = 'none';
+  document.getElementById('bt-view-results').style.display = 'block';
+}
+
+async function deleteBtHistory(id) {
+  if (!confirm('Smazat tento backtest?')) return;
+  await fetch(`/api/backtest/${id}`, {method:'DELETE'});
+  toast('🗑 Backtest smazán', 'warn');
+  loadBtHistory();
+}
+
+function renderBtTrades() {
+  const tbody = document.getElementById('bt-tbody');
+  const count = document.getElementById('bt-trades-count');
+  if (!count) return;
+  count.textContent = `${btTrades.length} simulovaných tradů`;
+  const start = (btPage-1)*PAGE_SZ, end = start+PAGE_SZ;
+  tbody.innerHTML = btTrades.slice(start,end).map(t => {
+    const pos = t.pnl>=0;
+    return `<tr>
+      <td class="td-m" style="color:var(--tx3)">${t.num}</td>
+      <td><span class="badge ${t.type==='LONG'?'badge-green':'badge-red'}">${t.type}</span></td>
+      <td class="td-m">${t.entry}</td>
+      <td class="td-m">${t.exit}</td>
+      <td class="td-m" style="color:var(--red)">${t.sl}</td>
+      <td class="td-m" style="color:var(--blue)">${t.tp||'–'}</td>
+      <td class="${pos?'td-pos':'td-neg'}">${pos?'+':''}$${t.pnl.toFixed(2)}</td>
+      <td><span class="badge ${t.exit_reason==='TP'?'badge-green':t.exit_reason==='SL'?'badge-red':'badge-grey'}">${t.exit_reason}</span></td>
+      <td class="td-m" style="font-size:11px">${(t.entry_time||'').slice(0,16)}</td>
+      <td class="td-m" style="font-size:11px">${(t.exit_time||'').slice(0,16)}</td>
+    </tr>`;
+  }).join('');
+  renderPagination('bt-pagination', btPage, Math.ceil(btTrades.length/PAGE_SZ), p => { btPage=p; renderBtTrades(); });
+}
+
+// ═══ OPTIMIZER ═══════════════════════════════════════════════════
+let _optOosChart = null;
+
+async function openOptimizer() {
+  const botId = document.getElementById('bt-bot').value;
+  if (!botId) { toast('Nejdřív vyber bota!', 'error'); return; }
+  if (!csvServerId && !csvContent) { toast('Nejdřív nahraj CSV!', 'error'); return; }
+
+  // Auto-fill pouze ČASY (ne datum) pokud pole prázdné
+  const isFrom  = document.getElementById('opt-is-from');
+  const isTo    = document.getElementById('opt-is-to');
+  const oosFrom = document.getElementById('opt-oos-from');
+  const oosTo   = document.getElementById('opt-oos-to');
+
+  // Přidej čas pokud je zadáno jen datum (nebo pokud je prázdné a bude zadáno)
+  // Placeholder nastavíme přes defaultní časy - ukazují se při focusu
+  // Pole zůstanou prázdná, ale při submit se doplní čas
+  const _ensureTime = (el, defaultTime) => {
+    if (el.value && el.value.length === 10) {
+      el.value = el.value + defaultTime;
+    }
+  };
+  _ensureTime(isFrom,  'T00:00');
+  _ensureTime(isTo,    'T23:59');
+  _ensureTime(oosFrom, 'T00:00');
+  _ensureTime(oosTo,   'T23:59');
+
+  // Načti parametry bota
+  document.getElementById('opt-params-list').innerHTML =
+    '<span style="color:var(--tx3)">Načítám parametry...</span>';
+  document.getElementById('modal-opt').classList.add('show');
+
+  const res  = await fetch('/api/backtest/scan_params', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({bot_id: botId})
+  });
+  const data = await res.json();
+
+  const params = data.params || [];
+  const combos = data.total_combos || 0;
+
+  if (!params.length) {
+    document.getElementById('opt-params-list').innerHTML =
+      `<span style="color:var(--yellow)">⚠️ Žádné parametry nenalezeny.<br>
+       Označ je v kódu komentářem <span style="color:var(--blue)">
+       # opt: min-max</span><br>
+       Příklad: <span style="color:var(--blue)">EMA_PERIOD = 9  # opt: 5-21</span></span>`;
+    return;
+  }
+
+  document.getElementById('opt-params-list').innerHTML = params.map(p =>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--b1)22">
+      <span style="color:var(--blue)">${esc(p.key)}</span>
+      <span style="color:var(--tx3)">${p.min} → ${p.max} (step ${p.step})</span>
+      <span style="color:var(--tx2)">${p.values.length} hodnot</span>
+    </div>`
+  ).join('');
+
+  document.getElementById('opt-combos').textContent = combos.toLocaleString();
+  const warn = document.getElementById('opt-combos-warn');
+  if (combos > 500)       warn.textContent = '⚠️ Bude redukováno na max 500';
+  else if (combos > 200)  warn.textContent = '(může trvat 1-3 min)';
+  else                    warn.textContent = '(rychlé)';
+}
+
+async function runOptimization() {
+  const botId = document.getElementById('bt-bot').value;
+  if (!botId || (!csvServerId && !csvContent)) { toast('Vyber bota a nahraj CSV!', 'error'); return; }
+
+  // Načti hodnoty - datetime-local nebo jen date
+  let isFrom  = document.getElementById('opt-is-from').value;
+  let isTo    = document.getElementById('opt-is-to').value;
+  let oosFrom = document.getElementById('opt-oos-from').value;
+  let oosTo   = document.getElementById('opt-oos-to').value;
+
+  // Přidej čas pokud chybí (jen datum)
+  if (isFrom  && isFrom.length  === 10) isFrom  += 'T00:00';
+  if (isTo    && isTo.length    === 10) isTo    += 'T23:59';
+  if (oosFrom && oosFrom.length === 10) oosFrom += 'T00:00';
+  if (oosTo   && oosTo.length   === 10) oosTo   += 'T23:59';
+
+  if (!isFrom || !isTo)   { toast('Zadej In-Sample období!', 'error'); return; }
+  if (!oosFrom || !oosTo) { toast('Zadej Out-of-Sample období!', 'error'); return; }
+
+  const btn = document.getElementById('opt-run-btn');
+  btn.textContent = '⏳ Optimalizuji...'; btn.disabled = true;
+
+  try {
+    const balance = parseFloat(document.getElementById('bt-balance').value || '50000');
+    const res = await fetch('/api/backtest/optimize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        bot_id:        botId,
+        csv_id:        csvServerId || null,
+        csv:           csvServerId ? '' : csvContent,
+        insample_from: isFrom,
+        insample_to:   isTo,
+        oos_from:      oosFrom,
+        oos_to:        oosTo,
+        start_balance: balance,
+        timeframe:     parseInt(document.getElementById('bt-tf').value || '3'),
+        min_winrate:   document.getElementById('opt-min-wr').value || null,
+        min_rr:        document.getElementById('opt-min-rr').value || null,
+        max_dd:        document.getElementById('opt-max-dd').value || null,
+        max_combos:    parseInt(document.getElementById('opt-max-combos').value || '500'),
+      })
+    });
+    const data = await res.json();
+
+    closeModal('modal-opt');
+
+    if (!data.success) { toast('❌ ' + data.error, 'error'); return; }
+
+    renderOptResults(data, balance);
+    document.getElementById('bt-view-form').style.display    = 'none';
+    document.getElementById('bt-view-results').style.display = 'none';
+    document.getElementById('bt-view-opt').style.display     = 'block';
+    toast(`✅ Hotovo za ${data.elapsed_sec}s · ${data.tested_combos} kombinací`, 'success');
+
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+  finally {
+    clearInterval(fakeOptIv);
+    updateProgress(100, 'Hotovo!');
+    setTimeout(hideProgress, 500);
+    btn.textContent = '⚡ Spustit optimalizaci'; btn.disabled = false;
+  }
+}
+
+function renderOptResults(data, startBalance) {
+  const sb = startBalance || 50000;
+
+  // Subtitle
+  document.getElementById('opt-result-sub').textContent =
+    `${data.tested_combos} kombinací · ${data.elapsed_sec}s · ` +
+    (data.opt_params||[]).map(p=>p.key).join(', ');
+
+  // Verdict banner
+  const vColors = {
+    PASS: {bg:'#10b98118', border:'#10b98140', color:'#10b981'},
+    WARN: {bg:'#f59e0b18', border:'#f59e0b40', color:'#f59e0b'},
+    FAIL: {bg:'#ef444418', border:'#ef444440', color:'#ef4444'},
+  };
+  const vc = vColors[data.verdict] || vColors.WARN;
+  const banner = document.getElementById('opt-verdict-banner');
+  banner.style.cssText = `background:${vc.bg};border:1px solid ${vc.border};color:${vc.color};padding:16px 20px;border-radius:var(--r);margin-bottom:16px;font-size:14px;font-weight:500`;
+  banner.textContent = data.verdict_msg || '';
+
+  // Nejlepší parametry
+  const bp = data.best_params || {};
+  const bpEl = document.getElementById('opt-best-params');
+  if (bpEl) {
+    bpEl.innerHTML = Object.entries(bp).length
+      ? Object.entries(bp).map(([k,v]) =>
+          `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--b1)44">
+            <span style="color:var(--tx3)">${esc(k)}</span>
+            <span style="color:var(--blue);font-weight:700">${v}</span>
+          </div>`
+        ).join('')
+      : '<span style="color:var(--tx3)">Žádné parametry</span>';
+  }
+
+  // IS vs OOS porovnání
+  const is  = data.insample_stats || {};
+  const oos = data.oos_stats      || {};
+  const rows = [
+    ['Winrate',      `${is.winrate||0}%`,                `${oos.winrate||0}%`,    (oos.winrate||0) >= (is.winrate||0)*0.85],
+    ['Total PnL',    `$${(is.total_pnl||0).toFixed(0)}`, `$${(oos.total_pnl||0).toFixed(0)}`, (oos.total_pnl||0) > 0],
+    ['Avg R:R',      is.avg_rr||0,                       oos.avg_rr||0,           (oos.avg_rr||0) >= 1],
+    ['Profit Factor',is.profit_factor||0,                oos.profit_factor||0,    (oos.profit_factor||0) >= 1],
+    ['Max Drawdown', `$${(is.max_dd||0).toFixed(0)}`,    `$${(oos.max_dd||0).toFixed(0)}`, true],
+    ['Total Trades', is.total_trades||0,                 oos.total_trades||0,     true],
+  ];
+  const compEl = document.getElementById('opt-comparison');
+  if (compEl) {
+    compEl.style.cssText = 'grid-column:span 3;display:contents';
+    compEl.innerHTML = rows.map(([label, isV, oosV, ok]) =>
+      `<div style="padding:7px 0;border-bottom:1px solid var(--b1)44;font-size:12px;color:var(--tx3)">${label}</div>
+       <div style="padding:7px 0;border-bottom:1px solid var(--b1)44;font-size:12px;font-family:var(--mono);text-align:center;color:var(--blue)">${isV}</div>
+       <div style="padding:7px 0;border-bottom:1px solid var(--b1)44;font-size:12px;font-family:var(--mono);text-align:center;color:${ok?'var(--green)':'var(--red)'}">${oosV}</div>`
+    ).join('');
+  }
+
+  // OOS Equity chart
+  const oosEq = (data.oos_equity||[]).map(e => ({...e, value: e.value + sb}));
+  const step  = Math.max(1, Math.floor(oosEq.length/400));
+  const oosS  = oosEq.filter((_,i) => i%step===0 || i===oosEq.length-1);
+  const oCtx  = document.getElementById('opt-oos-chart');
+  if (oCtx) {
+    if (_optOosChart) _optOosChart.destroy();
+    const grad = oCtx.getContext('2d').createLinearGradient(0,0,0,260);
+    grad.addColorStop(0,   'rgba(16,185,129,0.3)');
+    grad.addColorStop(1,   'rgba(16,185,129,0.0)');
+    _optOosChart = new Chart(oCtx, {
+      type:'line',
+      data:{labels:oosS.map(e=>e.time||`#${e.trade}`),datasets:[{
+        data:oosS.map(e=>e.value),
+        borderColor:'#10b981',backgroundColor:grad,
+        borderWidth:2,fill:true,tension:.3,pointRadius:0,
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2333',bodyColor:'#e2e8f0',
+          callbacks:{label:c=>`$${c.parsed.y.toFixed(2)}`}}},
+        scales:{
+          x:{ticks:{color:'#7a90a8',font:{size:10,family:'JetBrains Mono'},maxTicksLimit:8},grid:{color:'#1c233300'}},
+          y:{ticks:{color:'#7a90a8',font:{size:10},callback:v=>`$${v}`},grid:{color:'#2a365055'}}
+        }
+      }
+    });
+  }
+
+  // Top 10 tabulka
+  const tbody = document.getElementById('opt-top-tbody');
+  if (tbody) {
+    tbody.innerHTML = (data.top_results||[]).map((r, i) => {
+      const s = r.stats;
+      const pPos = (s.total_pnl||0) >= 0;
+      const params = Object.entries(r.params).map(([k,v])=>`${k}=${v}`).join(', ');
+      return `<tr style="${i===0?'background:var(--blue-dim)':''}">
+        <td style="font-family:var(--mono);color:var(--blue);font-weight:700">${r.score}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--tx3)">${esc(params)}</td>
+        <td style="font-family:var(--mono)">${s.winrate}%</td>
+        <td style="font-family:var(--mono)">${s.avg_rr}</td>
+        <td style="font-family:var(--mono)">${s.profit_factor}</td>
+        <td style="font-family:var(--mono);color:var(--red)">$${(s.max_dd||0).toFixed(0)}</td>
+        <td class="${pPos?'td-pos':'td-neg'}">${pPos?'+':''}$${(s.total_pnl||0).toFixed(0)}</td>
+        <td style="font-family:var(--mono)">${s.total_trades}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ═══ HISTORY TABS ════════════════════════════════════════════
+function switchHistTab(tab) {
+  const isBt = tab === 'bt';
+  document.getElementById('hist-bt-panel').style.display  = isBt ? 'block' : 'none';
+  document.getElementById('hist-opt-panel').style.display = isBt ? 'none'  : 'block';
+  const tabBt  = document.getElementById('tab-bt');
+  const tabOpt = document.getElementById('tab-opt');
+  tabBt.style.background    = isBt ? 'var(--blue-dim)' : 'transparent';
+  tabBt.style.color         = isBt ? 'var(--blue)'     : 'var(--tx3)';
+  tabBt.style.borderBottom  = isBt ? '2px solid var(--blue)' : '2px solid transparent';
+  tabOpt.style.background   = !isBt ? 'var(--blue-dim)' : 'transparent';
+  tabOpt.style.color        = !isBt ? 'var(--blue)'     : 'var(--tx3)';
+  tabOpt.style.borderBottom = !isBt ? '2px solid var(--blue)' : '2px solid transparent';
+  if (!isBt) loadOptHistory();
+}
+
+// ═══ OPT RANGE EDITOR ══════════════════════════════════════
+let _allCodeParams = [];
+
+function toggleOptRangeEditor() {
+  const el = document.getElementById('opt-range-editor');
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  document.getElementById('btn-edit-ranges').textContent = visible ? '✏️ Nastavit rozsahy' : '✕ Zavřít';
+  if (!visible) renderRangeInputs();
+}
+
+function renderRangeInputs() {
+  const botId = document.getElementById('bt-bot').value;
+  if (!botId) return;
+  // Najdi všechny VELKÁ_PÍSMENA parametry z kódu bota
+  fetch(`/api/bots/${botId}`)
+    .then(r => r.json())
+    .then(b => {
+      const code = b.code || '';
+      // Detekuj všechny parametry (s i bez # opt)
+      const allParams = [];
+      const re = /^([A-Z_][A-Z0-9_]*)\s*=\s*([\d.]+)(?:\s*#\s*opt:\s*([\d.]+)-([\d.]+)(?:,([\d.]+))?)?/gm;
+      let m;
+      while ((m = re.exec(code)) !== null) {
+        const key = m[1];
+        if (['TRUE','FALSE','NONE'].includes(key)) continue;
+        allParams.push({
+          key,
+          default: parseFloat(m[2]),
+          hasOpt:  !!m[3],
+          min:     m[3] ? parseFloat(m[3]) : '',
+          max:     m[4] ? parseFloat(m[4]) : '',
+          step:    m[5] ? parseFloat(m[5]) : '',
+        });
+      }
+      _allCodeParams = allParams;
+      const el = document.getElementById('opt-range-inputs');
+      if (!allParams.length) {
+        el.innerHTML = '<div style="color:var(--tx3);font-size:12px">Žádné parametry nenalezeny v kódu bota.</div>';
+        return;
+      }
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:8px;font-size:11px;color:var(--tx3);padding:0 0 6px;border-bottom:1px solid var(--b1)">
+          <span>PARAMETR (výchozí)</span><span>MIN</span><span>MAX</span><span>KROK</span>
+        </div>` +
+        allParams.map(p => `
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:8px;align-items:center">
+          <div style="font-family:var(--mono);font-size:12px">
+            <span style="color:${p.hasOpt?'var(--green)':'var(--tx2)'}">${esc(p.key)}</span>
+            <span style="color:var(--tx3);font-size:11px"> = ${p.default}</span>
+          </div>
+          <input type="number" id="opt-r-min-${p.key}" value="${p.min}" placeholder="min"
+            style="padding:5px 8px;font-size:12px">
+          <input type="number" id="opt-r-max-${p.key}" value="${p.max}" placeholder="max"
+            style="padding:5px 8px;font-size:12px">
+          <input type="number" id="opt-r-step-${p.key}" value="${p.step}" placeholder="krok"
+            style="padding:5px 8px;font-size:12px">
+        </div>`).join('');
+    });
+}
+
+async function applyOptRanges() {
+  const botId = document.getElementById('bt-bot').value;
+  if (!botId) return;
+  const res = await fetch(`/api/bots/${botId}`);
+  const b   = await res.json();
+  let code  = b.code || '';
+
+  // Pro každý parametr aktualizuj nebo přidej # opt: komentář
+  for (const p of _allCodeParams) {
+    const min  = document.getElementById(`opt-r-min-${p.key}`)?.value;
+    const max  = document.getElementById(`opt-r-max-${p.key}`)?.value;
+    const step = document.getElementById(`opt-r-step-${p.key}`)?.value;
+    if (!min || !max) continue; // Přeskoč pokud nezadáno
+
+    const optComment = step ? `# opt: ${min}-${max},${step}` : `# opt: ${min}-${max}`;
+    // Nahraď nebo přidej komentář na řádku s tímto parametrem
+    const re = new RegExp(`^(${p.key}\s*=\s*[\d.]+)(?:\s*#.*)?$`, 'gm');
+    code = code.replace(re, `$1    ${optComment}`);
+  }
+
+  // Ulož aktualizovaný kód
+  await fetch(`/api/bots/${botId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({...b, code, params: b.params || {}})
+  });
+
+  toast('✅ Rozsahy uloženy do kódu bota', 'success');
+  toggleOptRangeEditor();
+  // Znovu načti parametry
+  openOptimizer();
+}
+
+// ═══ OPT HISTORY ════════════════════════════════════════════
+async function loadOptHistory() {
+  const res  = await fetch('/api/optimization/history');
+  const hist = await res.json();
+  const tbody = document.getElementById('opt-hist-tbody');
+  const empty = document.getElementById('opt-hist-empty');
+  if (!tbody) return;
+  if (!hist.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  const vIcons = {PASS:'✅',WARN:'⚠️',FAIL:'❌'};
+  tbody.innerHTML = hist.map(h => `<tr style="cursor:pointer" onclick="loadOptDetail(${h.id})">
+    <td><span class="badge badge-blue">${esc(h.bot_name)}</span></td>
+    <td class="td-m" style="font-size:11px">${(h.insample_from||'').slice(0,10)} → ${(h.insample_to||'').slice(0,10)}</td>
+    <td class="td-m" style="font-size:11px">${(h.oos_from||'').slice(0,10)} → ${(h.oos_to||'').slice(0,10)}</td>
+    <td class="td-m">${h.tested_combos||0}</td>
+    <td><span class="badge ${h.verdict==='PASS'?'badge-green':h.verdict==='FAIL'?'badge-red':'badge-yellow'}">${vIcons[h.verdict]||''} ${h.verdict||'–'}</span></td>
+    <td class="td-m" style="font-size:11px">${(h.created_at||'').slice(0,16)}</td>
+    <td><button class="btn btn-sm btn-ghost" style="color:var(--red);border-color:var(--red)22;padding:3px 8px"
+      onclick="event.stopPropagation();deleteOptHistory(${h.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+async function loadOptDetail(id) {
+  const res  = await fetch(`/api/optimization/${id}`);
+  const data = await res.json();
+  if (!data.best_params) return;
+  // Převeď na formát renderOptResults
+  data.success      = true;
+  data.opt_params   = [];
+  data.elapsed_sec  = data.elapsed_sec || '–';
+  data.bars_total   = 0;
+  renderOptResults(data, 50000);
+  document.getElementById('bt-view-form').style.display    = 'none';
+  document.getElementById('bt-view-results').style.display = 'none';
+  document.getElementById('bt-view-opt').style.display     = 'block';
+}
+
+async function deleteOptHistory(id) {
+  if (!confirm('Smazat tuto optimalizaci?')) return;
+  await fetch(`/api/optimization/${id}`, {method:'DELETE'});
+  toast('🗑 Optimalizace smazána','warn');
+  loadOptHistory();
+}
+
+// ═══ PAGINACE ══════════════════════════════════════════════════
+function renderPagination(containerId, current, total, onPage) {
+  const el = document.getElementById(containerId);
+  if (!el || total <= 1) { if(el) el.innerHTML=''; return; }
+  let html = `<span class="pg-info">Strana ${current} / ${total}</span>`;
+  html += `<button class="pg-btn" ${current<=1?'disabled':''} onclick="(${onPage})(${current-1})">←</button>`;
+  html += `<button class="pg-btn" ${current>=total?'disabled':''} onclick="(${onPage})(${current+1})">→</button>`;
+  el.innerHTML = html;
+}
+
+// ═══ CHART OPTIONS ════════════════════════════════════════════
+function chartOpts(prefix='') {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    animation:{duration:400},
+    plugins:{legend:{display:false},tooltip:{
+      backgroundColor:'#1c2333',borderColor:'#2a3650',borderWidth:1,
+      titleColor:'#94a3b8',bodyColor:'#e2e8f0',
+      callbacks:{label:ctx=>`${prefix}${ctx.parsed.y.toFixed(2)}`}
+    }},
+    scales:{
+      x:{ticks:{color:'#475569',font:{family:'JetBrains Mono',size:10}},grid:{color:'#1c233300'},maxTicksLimit:8},
+      y:{ticks:{color:'#475569',font:{family:'JetBrains Mono',size:10},callback:v=>`${prefix}${v}`},grid:{color:'#2a3650'}}
+    }
+  };
+}
+
+// ═══ TOAST ════════════════════════════════════════════════════
+function toast(msg, type='success') {
+  const c = {
+    success:{bg:'#0d1f18',brd:'#10b98140',col:'#10b981'},
+    error:  {bg:'#1f0d0d',brd:'#ef444440',col:'#ef4444'},
+    warn:   {bg:'#1f1a0d',brd:'#f59e0b40',col:'#f59e0b'},
+  }[type]||{bg:'#1c2333',brd:'#3b82f640',col:'#3b82f6'};
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.cssText = `background:${c.bg};border:1px solid ${c.brd};color:${c.col}`;
+  el.textContent = msg;
+  el.onclick = ()=>el.remove();
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 5000);
+}
+
+// ═══ PROGRESS ═════════════════════════════════════════════════
+let _progressEs = null;
+
+function showProgress(title) {
+  document.getElementById('progress-title').textContent = title;
+  document.getElementById('progress-msg').textContent   = 'Připravuji...';
+  document.getElementById('progress-bar-fill').style.width = '5%';
+  document.getElementById('progress-pct').textContent   = '0%';
+  document.getElementById('progress-overlay').classList.add('show');
+}
+
+function hideProgress() {
+  document.getElementById('progress-overlay').classList.remove('show');
+  if (_progressEs) { _progressEs.close(); _progressEs = null; }
+}
+
+function updateProgress(pct, msg) {
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+  if (msg) document.getElementById('progress-msg').textContent = msg;
+}
+
+// Simuluje plynulý progress pokud server nepošle aktualizace
+function fakeProgress(durationMs) {
+  let start = Date.now(), pct = 5;
+  const iv = setInterval(() => {
+    const elapsed = Date.now() - start;
+    const target  = Math.min(90, Math.round(5 + (elapsed / durationMs) * 85));
+    if (target > pct) { pct = target; updateProgress(pct, null); }
+    if (pct >= 90) clearInterval(iv);
+  }, 300);
+  return iv;
+}
+
+// ═══ UTILS ════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
