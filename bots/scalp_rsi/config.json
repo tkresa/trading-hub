@@ -1,0 +1,37 @@
+{
+  "name": "RSI Scalper",
+  "description": "Rychlý scalping na oversold/overbought RSI signálech. ES/MES futures.",
+  "instrument": "MES",
+  "params": {
+    "account_size": 25000,
+    "daily_loss_limit": 400,
+    "max_drawdown": 900,
+    "risk_per_trade_pct": 0.15,
+    "max_trades_per_day": 6,
+    "contracts": 1,
+    "rsi_period": 7,
+    "rsi_oversold": 25,
+    "rsi_overbought": 75,
+    "tp_points": 8,
+    "sl_points": 5,
+    "loop_interval_sec": 60
+  },
+  "param_schema": [
+    { "key": "account_size",       "label": "Account Size ($)",      "type": "number", "min": 1000,  "max": 200000, "step": 1000, "group": "Account" },
+    { "key": "daily_loss_limit",   "label": "Daily Loss Limit ($)",  "type": "number", "min": 100,   "max": 2000,   "step": 50,   "group": "Account" },
+    { "key": "max_drawdown",       "label": "Max Drawdown ($)",      "type": "number", "min": 200,   "max": 5000,   "step": 100,  "group": "Account" },
+    { "key": "risk_per_trade_pct", "label": "Risk per Trade (%)",    "type": "number", "min": 0.05,  "max": 1.0,    "step": 0.05, "group": "Risk" },
+    { "key": "max_trades_per_day", "label": "Max Trades / Day",      "type": "number", "min": 1,     "max": 20,     "step": 1,    "group": "Risk" },
+    { "key": "contracts",          "label": "Contracts",             "type": "number", "min": 1,     "max": 10,     "step": 1,    "group": "Risk" },
+    { "key": "rsi_period",         "label": "RSI Period",            "type": "number", "min": 3,     "max": 30,     "step": 1,    "group": "Strategy" },
+    { "key": "rsi_oversold",       "label": "RSI Oversold Level",    "type": "number", "min": 10,    "max": 40,     "step": 1,    "group": "Strategy" },
+    { "key": "rsi_overbought",     "label": "RSI Overbought Level",  "type": "number", "min": 60,    "max": 90,     "step": 1,    "group": "Strategy" },
+    { "key": "tp_points",          "label": "Take Profit (pts)",     "type": "number", "min": 2,     "max": 50,     "step": 1,    "group": "Strategy" },
+    { "key": "sl_points",          "label": "Stop Loss (pts)",       "type": "number", "min": 2,     "max": 50,     "step": 1,    "group": "Strategy" }
+  ],
+  "meta": {
+    "created": "2025-01-01T00:00:00",
+    "version": "1.0",
+    "tags": ["RSI", "scalping", "MES"]
+  }
+}

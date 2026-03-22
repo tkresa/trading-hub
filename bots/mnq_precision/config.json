@@ -1,0 +1,51 @@
+{
+  "name": "NQ Morning Precision",
+  "description": "VWAP Retest + ORB Breakout na MNQ. Prop firm safe (Topstep $50K).",
+  "instrument": "MNQ",
+  "params": {
+    "account_size": 50000,
+    "daily_loss_limit": 800,
+    "max_drawdown": 1800,
+    "risk_per_trade_pct": 0.20,
+    "max_trades_per_day": 3,
+    "contracts": 2,
+    "atr_period": 14,
+    "atr_sl_mult": 1.5,
+    "tp1_rr": 1.0,
+    "tp2_rr": 2.5,
+    "ema_fast": 9,
+    "ema_slow": 21,
+    "rsi_period": 14,
+    "rsi_low": 35,
+    "rsi_high": 65,
+    "min_daily_range": 40,
+    "news_block_mins": 30,
+    "min_volume_ratio": 1.2,
+    "loop_interval_sec": 300
+  },
+  "param_schema": [
+    { "key": "account_size",        "label": "Account Size ($)",         "type": "number", "min": 1000,  "max": 500000, "step": 1000,  "group": "Account" },
+    { "key": "daily_loss_limit",    "label": "Daily Loss Limit ($)",     "type": "number", "min": 100,   "max": 5000,   "step": 50,    "group": "Account" },
+    { "key": "max_drawdown",        "label": "Max Drawdown ($)",         "type": "number", "min": 500,   "max": 10000,  "step": 100,   "group": "Account" },
+    { "key": "risk_per_trade_pct",  "label": "Risk per Trade (%)",       "type": "number", "min": 0.05,  "max": 2.0,    "step": 0.05,  "group": "Risk" },
+    { "key": "max_trades_per_day",  "label": "Max Trades / Day",         "type": "number", "min": 1,     "max": 10,     "step": 1,     "group": "Risk" },
+    { "key": "contracts",           "label": "Max Contracts",            "type": "number", "min": 1,     "max": 20,     "step": 1,     "group": "Risk" },
+    { "key": "atr_period",          "label": "ATR Period",               "type": "number", "min": 5,     "max": 50,     "step": 1,     "group": "Strategy" },
+    { "key": "atr_sl_mult",         "label": "ATR Stop Multiplier",      "type": "number", "min": 0.5,   "max": 5.0,    "step": 0.1,   "group": "Strategy" },
+    { "key": "tp1_rr",              "label": "TP1 R:R",                  "type": "number", "min": 0.5,   "max": 5.0,    "step": 0.1,   "group": "Strategy" },
+    { "key": "tp2_rr",              "label": "TP2 R:R",                  "type": "number", "min": 1.0,   "max": 10.0,   "step": 0.1,   "group": "Strategy" },
+    { "key": "ema_fast",            "label": "EMA Fast",                 "type": "number", "min": 3,     "max": 50,     "step": 1,     "group": "Indicators" },
+    { "key": "ema_slow",            "label": "EMA Slow",                 "type": "number", "min": 10,    "max": 200,    "step": 1,     "group": "Indicators" },
+    { "key": "rsi_period",          "label": "RSI Period",               "type": "number", "min": 5,     "max": 50,     "step": 1,     "group": "Indicators" },
+    { "key": "rsi_low",             "label": "RSI Low Filter",           "type": "number", "min": 10,    "max": 50,     "step": 1,     "group": "Indicators" },
+    { "key": "rsi_high",            "label": "RSI High Filter",          "type": "number", "min": 50,    "max": 90,     "step": 1,     "group": "Indicators" },
+    { "key": "min_daily_range",     "label": "Min Daily Range (pts)",    "type": "number", "min": 10,    "max": 200,    "step": 5,     "group": "Filters" },
+    { "key": "news_block_mins",     "label": "News Blackout (min)",      "type": "number", "min": 0,     "max": 60,     "step": 5,     "group": "Filters" },
+    { "key": "min_volume_ratio",    "label": "Min Volume Ratio",         "type": "number", "min": 1.0,   "max": 3.0,    "step": 0.1,   "group": "Filters" }
+  ],
+  "meta": {
+    "created": "2025-01-01T00:00:00",
+    "version": "2.0",
+    "tags": ["VWAP", "ORB", "prop-firm", "MNQ"]
+  }
+}

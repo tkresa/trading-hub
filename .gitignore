@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+data/*.db
+bot.log
+logs/
+bots_runtime/
+.deps_ok
+.claude/
