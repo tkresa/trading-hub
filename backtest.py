@@ -286,6 +286,8 @@ def _simulate_vectorized(df: pd.DataFrame, signals: np.ndarray,
     sl_pts      = float(params.get("sl_points", params.get("SL_POINTS", 18)))
     contracts   = float(params.get("contracts", params.get("TRADE_QTY", 1)))
     point_val   = float(params.get("point_value", 2.0))
+    commission  = float(params.get("commission", 0.0))   # $ per side per contract
+    slippage    = float(params.get("slippage",   0.0))   # points per side
     trailing    = style_info["has_trailing"]
     tp_mult     = float(params.get("tp_mult", 1.5))
 
@@ -321,7 +323,9 @@ def _simulate_vectorized(df: pd.DataFrame, signals: np.ndarray,
 
             if exit_price is not None:
                 pnl = (exit_price - position["entry"]) * (1 if typ == 1 else -1)
+                pnl -= slippage * 2  # slippage na vstup i výstup
                 pnl *= point_val * contracts
+                pnl -= commission * 2 * contracts  # komise round-trip
                 trades.append({
                     "num":         len(trades) + 1,
                     "type":        "LONG" if typ == 1 else "SHORT",
@@ -374,7 +378,9 @@ def _simulate_vectorized(df: pd.DataFrame, signals: np.ndarray,
     if position is not None:
         exit_p = c[-1]
         pnl = (exit_p - position["entry"]) * (1 if position["type"] == 1 else -1)
+        pnl -= slippage * 2
         pnl *= point_val * contracts
+        pnl -= commission * 2 * contracts
         trades.append({
             "num":         len(trades) + 1,
             "type":        "LONG" if position["type"] == 1 else "SHORT",

@@ -516,6 +516,18 @@ tr:hover td{background:var(--s2)66}
             </div>
             <div class="fgrid">
               <div class="frow">
+                <label>Komise ($/kontrakt/strana)</label>
+                <input type="number" id="bt-commission" value="2.25" min="0" step="0.25">
+                <p class="fhint">Např. NinjaTrader: $2.25, TopStep: $0</p>
+              </div>
+              <div class="frow">
+                <label>Slippage (body/strana)</label>
+                <input type="number" id="bt-slippage" value="0.25" min="0" step="0.25">
+                <p class="fhint">Průměrný slippage při plnění příkazu</p>
+              </div>
+            </div>
+            <div class="fgrid">
+              <div class="frow">
                 <label>Datum + čas od</label>
                 <input type="datetime-local" id="bt-from" value="">
                 <p class="fhint">Nechej prázdné pro vše od začátku</p>
@@ -657,6 +669,19 @@ tr:hover td{background:var(--s2)66}
       <div style="position:relative;height:280px"><canvas id="bt-eq-chart"></canvas></div>
     </div>
 
+    <!-- Bot Score Card -->
+    <div class="card" id="bt-score-card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div id="bt-grade-circle" style="width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;flex-shrink:0;border:3px solid">A</div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px" id="bt-score-title">Hodnocení bota</div>
+          <div style="font-size:13px;color:var(--tx2);line-height:1.6" id="bt-score-summary"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:180px" id="bt-score-bars"></div>
+      </div>
+      <div id="bt-score-tips" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+
     <!-- 3 panely: RR / Profit Factor / Expectancy -->
     <div class="g3" style="margin-bottom:14px;gap:14px">
 
@@ -777,6 +802,17 @@ tr:hover td{background:var(--s2)66}
       <div style="position:relative;height:180px"><canvas id="bt-month-chart"></canvas></div>
     </div>
 
+    <!-- Měsíční P&L tabulka -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">Měsíční výsledky</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Měsíc</th><th>Trades</th><th>Wins</th><th>WR</th><th>PnL</th><th>Avg PnL/trade</th></tr></thead>
+          <tbody id="bt-monthly-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Trades tabulka -->
     <div class="card">
       <div class="card-title" style="justify-content:space-between;margin-bottom:12px">
@@ -823,6 +859,13 @@ tr:hover td{background:var(--s2)66}
           <div id="opt-comparison"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Aplikovat parametry -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+      <button class="btn btn-primary" onclick="applyBestParams()" id="btn-apply-params" style="gap:8px">
+        ✅ Použít nejlepší parametry pro bota
+      </button>
     </div>
 
     <!-- OOS Equity křivka -->
@@ -931,6 +974,11 @@ tr:hover td{background:var(--s2)66}
             <label>Max. kombinací</label>
             <input type="number" id="opt-max-combos" value="500" min="10" max="2000">
             <p class="fhint">Více = přesnější, ale pomalejší</p>
+          </div>
+          <div class="frow">
+            <label>Min. počet tradů (IS)</label>
+            <input type="number" id="opt-min-trades" value="10" min="1" max="500">
+            <p class="fhint">Minimum tradů pro platnou kombinaci parametrů</p>
           </div>
         </div>
       </div>
@@ -1509,6 +1557,8 @@ async function runBacktest() {
         period_to:    document.getElementById('bt-to').value,
         timeframe:    parseInt(document.getElementById('bt-tf').value||'1'),
         start_balance:balance,
+        commission:   parseFloat(document.getElementById('bt-commission')?.value || '0'),
+        slippage:     parseFloat(document.getElementById('bt-slippage')?.value || '0'),
       })
     });
     const data = await res.json();
@@ -1688,11 +1738,109 @@ function renderBtResults(data, startBalance) {
   renderDayChart(s.perf_by_day   || []);
   renderMonthChart(s.perf_by_month || []);
   renderRrChart(data.trades || []);
+  renderBotScoreCard(s, sb);
+  renderMonthlyTable(s.perf_by_month || []);
 
   // Trades
   btTrades = data.trades || [];
   btPage   = 1;
   renderBtTrades();
+}
+
+function renderBotScoreCard(s, startBalance) {
+  let score = 0;
+  const pf = parseFloat(s.profit_factor) || 0;
+  const wr = parseFloat(s.winrate) || 0;
+  const sharpe = parseFloat(s.sharpe_ratio) || 0;
+  const rf = parseFloat(s.recovery_factor) || 0;
+  const dd = parseFloat(s.max_dd) || 0;
+  const trades = parseInt(s.total_trades) || 0;
+  const pnl = parseFloat(s.total_pnl) || 0;
+
+  score += Math.min(25, pf >= 2 ? 25 : pf >= 1.5 ? 18 : pf >= 1.2 ? 12 : pf >= 1.0 ? 6 : 0);
+  score += Math.min(20, wr >= 60 ? 20 : wr >= 55 ? 15 : wr >= 50 ? 10 : wr >= 45 ? 5 : 0);
+  score += Math.min(20, sharpe >= 2 ? 20 : sharpe >= 1 ? 14 : sharpe >= 0.5 ? 8 : sharpe >= 0 ? 3 : 0);
+  score += Math.min(15, rf >= 3 ? 15 : rf >= 2 ? 11 : rf >= 1 ? 6 : rf >= 0 ? 2 : 0);
+  score += Math.min(10, trades >= 100 ? 10 : trades >= 50 ? 7 : trades >= 20 ? 4 : trades >= 5 ? 2 : 0);
+  score += pnl > 0 ? 10 : 0;
+
+  let grade, gradeColor, gradeLabel;
+  if      (score >= 80) { grade = 'A'; gradeColor = '#10b981'; gradeLabel = 'Výborný bot'; }
+  else if (score >= 65) { grade = 'B'; gradeColor = '#3b82f6'; gradeLabel = 'Dobrý bot'; }
+  else if (score >= 50) { grade = 'C'; gradeColor = '#f59e0b'; gradeLabel = 'Průměrný bot'; }
+  else if (score >= 35) { grade = 'D'; gradeColor = '#f97316'; gradeLabel = 'Podprůměrný bot'; }
+  else                   { grade = 'F'; gradeColor = '#ef4444'; gradeLabel = 'Neziskový bot'; }
+
+  const circle = document.getElementById('bt-grade-circle');
+  circle.textContent = grade;
+  circle.style.color = gradeColor;
+  circle.style.borderColor = gradeColor;
+  circle.style.background = gradeColor + '15';
+
+  document.getElementById('bt-score-title').textContent = gradeLabel + ' — ' + score + '/100 bodů';
+
+  const lines = [];
+  if (pnl > 0) lines.push('Bot je <strong>ziskový</strong> s celkovým P&L <strong style="color:var(--green)">+$' + pnl.toFixed(0) + '</strong>.');
+  else lines.push('Bot je <strong>ztrátový</strong> s celkovým P&L <strong style="color:var(--red)">$' + pnl.toFixed(0) + '</strong>.');
+  lines.push('Win rate ' + wr + '% · Profit Factor ' + pf + ' · Sharpe ' + sharpe);
+  if (s.session_stats) {
+    const bestSess = Object.entries(s.session_stats).sort((a,b) => b[1].winrate - a[1].winrate)[0];
+    if (bestSess) lines.push('Nejlepší session: <strong>' + bestSess[0] + '</strong> (WR ' + bestSess[1].winrate + '%)');
+  }
+  document.getElementById('bt-score-summary').innerHTML = lines.join('<br>');
+
+  const metrics = [
+    { label: 'Profit Factor', val: Math.min(100, pf / 3 * 100), raw: pf, color: pf >= 1.5 ? '#10b981' : pf >= 1 ? '#f59e0b' : '#ef4444' },
+    { label: 'Win Rate',      val: wr,                           raw: wr + '%', color: wr >= 55 ? '#10b981' : wr >= 45 ? '#f59e0b' : '#ef4444' },
+    { label: 'Sharpe Ratio',  val: Math.min(100, (sharpe + 1) / 4 * 100), raw: sharpe, color: sharpe >= 1 ? '#10b981' : sharpe >= 0 ? '#f59e0b' : '#ef4444' },
+    { label: 'Recovery F.',   val: Math.min(100, rf / 4 * 100), raw: rf, color: rf >= 2 ? '#10b981' : rf >= 1 ? '#f59e0b' : '#ef4444' },
+  ];
+  document.getElementById('bt-score-bars').innerHTML = metrics.map(function(m) {
+    const rawStr = typeof m.raw === 'number' ? m.raw.toFixed(2) : m.raw;
+    return '<div style="min-width:160px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--tx3)">' + m.label + '</span><span style="font-family:var(--mono);color:' + m.color + ';font-weight:600">' + rawStr + '</span></div><div style="height:5px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="height:100%;width:' + Math.max(2, m.val) + '%;background:' + m.color + ';border-radius:3px;transition:width .5s"></div></div></div>';
+  }).join('');
+
+  const tips = [];
+  if (trades < 20) tips.push({ type:'warn', text: 'Pouze ' + trades + ' tradů — výsledky nemusí být statisticky spolehlivé. Otestuj na delším období.' });
+  if (dd > Math.abs(pnl) * 0.5 && pnl > 0) tips.push({ type:'warn', text: 'Max drawdown ($' + dd.toFixed(0) + ') je více než 50% celkového zisku. Zvaž snížení velikosti pozice.' });
+  if (pf < 1.0) tips.push({ type:'bad', text: 'Profit Factor pod 1.0 znamená, že bot průměrně prodělává. Zkontroluj strategii nebo parametry.' });
+  if (s.exit_pct && s.exit_pct.SL > 70) tips.push({ type:'warn', text: s.exit_pct.SL + '% obchodů končí na Stop-Loss. Zvaž přenastavení SL nebo vstupní podmínky.' });
+  if (s.max_consec_losses >= 8) tips.push({ type:'warn', text: 'Max. ' + s.max_consec_losses + ' ztrát za sebou — připrav se psychologicky nebo nastav denní limit ztrát.' });
+  if (pnl > 0 && pf >= 1.5 && trades >= 30) tips.push({ type:'good', text: 'Bot splňuje základní kritéria pro reálné testování. Doporučujeme nejprve demo účet.' });
+  if (!tips.length) tips.push({ type:'info', text: 'Zkontroluj výsledky v jednotlivých sekcích níže pro detailní analýzu.' });
+
+  const tipColors = { good:'var(--green)', warn:'var(--yellow)', bad:'var(--red)', info:'var(--blue)' };
+  const tipIcons  = { good:'✅', warn:'⚠️', bad:'❌', info:'ℹ️' };
+  document.getElementById('bt-score-tips').innerHTML = tips.map(function(t) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--tx2);padding:6px 10px;background:' + tipColors[t.type] + '15;border-left:3px solid ' + tipColors[t.type] + ';border-radius:0 4px 4px 0"><span>' + tipIcons[t.type] + '</span><span>' + t.text + '</span></div>';
+  }).join('');
+}
+
+function renderMonthlyTable(perf_by_month) {
+  const tbody = document.getElementById('bt-monthly-tbody');
+  if (!tbody || !perf_by_month || !perf_by_month.length) return;
+  tbody.innerHTML = perf_by_month.map(function(m) {
+    const pnlColor = m.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const avg = m.total > 0 ? (m.pnl / m.total).toFixed(2) : '0.00';
+    const avgColor = parseFloat(avg) >= 0 ? 'var(--green)' : 'var(--red)';
+    return '<tr><td style="font-weight:600">' + m.label + '</td><td>' + m.total + '</td><td style="color:var(--green)">' + m.wins + '</td><td>' + m.winrate + '%</td><td style="font-family:var(--mono);font-weight:700;color:' + pnlColor + '">' + (m.pnl >= 0 ? '+' : '') + '$' + m.pnl.toFixed(2) + '</td><td style="font-family:var(--mono);color:' + avgColor + '">' + (parseFloat(avg) >= 0 ? '+' : '') + '$' + avg + '</td></tr>';
+  }).join('');
+}
+
+let _optLastResult = null;
+let _optBotId = null;
+
+async function applyBestParams() {
+  if (!_optLastResult || !_optLastResult.id) { toast('Nejdřív spusť optimalizaci', 'error'); return; }
+  if (!confirm('Přepsat parametry bota nejlepšími hodnotami z optimalizace?')) return;
+  const res = await fetch('/api/optimization/' + _optLastResult.id + '/apply', { method: 'POST' });
+  const d   = await res.json();
+  if (d.status === 'ok') {
+    toast('Parametry aplikovány na bota', 'success');
+    await loadBots();
+  } else {
+    toast('Chyba: ' + (d.error || 'Neznámá chyba'), 'error');
+  }
 }
 
 function renderRrChart(trades) {
@@ -2046,6 +2194,7 @@ async function runOptimization() {
         min_rr:        document.getElementById('opt-min-rr').value || null,
         max_dd:        document.getElementById('opt-max-dd').value || null,
         max_combos:    parseInt(document.getElementById('opt-max-combos').value || '500'),
+        min_trades:   parseInt(document.getElementById('opt-min-trades')?.value || '10'),
       })
     });
     const data = await res.json();
@@ -2070,6 +2219,7 @@ async function runOptimization() {
 }
 
 function renderOptResults(data, startBalance) {
+  _optLastResult = data;
   const sb = startBalance || 50000;
 
   // Subtitle

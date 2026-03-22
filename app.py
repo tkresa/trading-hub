@@ -387,6 +387,8 @@ def api_backtest_run():
     timeframe     = max(1, int(data.get("timeframe", 1)))
     start_balance = float(data.get("start_balance", 50000))
     params["start_balance"] = start_balance
+    if "commission" in data: params["commission"] = float(data["commission"])
+    if "slippage"   in data: params["slippage"]   = float(data["slippage"])
     csv_content = data.get("csv", "")
     if not csv_content and data.get("csv_id"):
         csv_content = _load_csv_by_id(data["csv_id"]) or ""
@@ -512,6 +514,25 @@ def api_opt_detail(result_id):
 def api_opt_delete(result_id):
     db.delete_optimization(result_id)
     return jsonify({"status": "deleted"})
+
+
+@app.route("/api/optimization/<int:result_id>/apply", methods=["POST"])
+def api_opt_apply(result_id):
+    """Aplikuje nejlepší parametry z optimalizace na bota."""
+    r = db.get_optimization_detail(result_id)
+    if not r: return jsonify({"error": "Nenalezeno"}), 404
+    b = db.get_bot(r["bot_id"])
+    if not b: return jsonify({"error": "Bot nenalezen"}), 404
+    best = r.get("best_params", {})
+    if not best: return jsonify({"error": "Žádné parametry"}), 400
+    old_params = json.loads(b.get("params") or "{}")
+    code = b["code"]
+    if 'DOPLNIT' in code:
+        injected = inject_params(code, best)
+    else:
+        injected = reinject_params(code, old_params, best)
+    db.update_bot(r["bot_id"], b["name"], b["description"], b["instrument"], injected, best)
+    return jsonify({"status": "ok", "params": best})
 
 
 # ═══ START ═════════════════════════════════════════════════════════════════
