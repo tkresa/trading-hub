@@ -86,6 +86,15 @@ def init_db():
                 stats_json       TEXT,
                 created_at       TEXT DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS data_files (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                csv_id           TEXT NOT NULL UNIQUE,
+                original_name    TEXT NOT NULL,
+                rows             INTEGER DEFAULT 0,
+                format           TEXT DEFAULT 'parquet',
+                created_at       TEXT DEFAULT (datetime('now'))
+            );
+
             CREATE INDEX IF NOT EXISTS idx_trades_bot_id    ON trades(bot_id);
             CREATE INDEX IF NOT EXISTS idx_trades_entry_time ON trades(entry_time DESC);
             CREATE INDEX IF NOT EXISTS idx_bt_bot_id         ON backtest_results(bot_id);
@@ -340,6 +349,36 @@ def save_backtest(bot_id, bot_name, period_from, period_to,
 def delete_backtest(result_id: int):
     with get_conn() as conn:
         conn.execute("DELETE FROM backtest_results WHERE id=?", (result_id,))
+
+
+def save_data_file(csv_id, original_name, rows=0, fmt="parquet"):
+    with get_conn() as conn:
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS data_files (id INTEGER PRIMARY KEY AUTOINCREMENT, csv_id TEXT NOT NULL UNIQUE, original_name TEXT NOT NULL, rows INTEGER DEFAULT 0, format TEXT DEFAULT 'parquet', created_at TEXT DEFAULT (datetime('now')))")
+        except Exception:
+            pass
+        conn.execute(
+            "INSERT OR REPLACE INTO data_files (csv_id, original_name, rows, format) VALUES (?,?,?,?)",
+            (csv_id, original_name, rows, fmt)
+        )
+
+
+def get_data_files():
+    with get_conn() as conn:
+        try:
+            rows = conn.execute("SELECT * FROM data_files ORDER BY created_at DESC").fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
+
+
+def delete_data_file(file_id):
+    with get_conn() as conn:
+        row = conn.execute("SELECT csv_id FROM data_files WHERE id=?", (file_id,)).fetchone()
+        if row:
+            conn.execute("DELETE FROM data_files WHERE id=?", (file_id,))
+            return row["csv_id"]
+        return None
 
 
 def get_backtest_results(bot_id=None, limit=10):

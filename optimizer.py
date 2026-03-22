@@ -130,7 +130,13 @@ def score_result(stats: dict, goals: dict) -> float:
         return None
 
     # Skóre = vážená kombinace metrik (vždy kladné i pro špatné výsledky)
-    wr_score  = max(stats["winrate"] / 100, 0)
+    wr = stats["winrate"]
+    # Penalizace extrémního winrate (>85% = pravděpodobný overfitting)
+    if wr > 85:
+        wr_score = 0.85 - (wr - 85) * 0.02  # progresivní penalizace
+    else:
+        wr_score = max(wr / 100, 0)
+
     pf_score  = min(max(stats["profit_factor"] / 3, 0), 1.0)
     rr_score  = min(max(stats["avg_rr"] / 3, 0), 1.0)
     pnl_norm  = stats["total_pnl"] / max(abs(stats["total_pnl"]), 1)
@@ -139,13 +145,18 @@ def score_result(stats: dict, goals: dict) -> float:
     dd_score  = 1.0 - min(dd_max / 10000, 1.0)
     sh_score  = min(max((stats.get("sharpe_ratio", 0) + 3) / 6, 0), 1.0)
 
+    # Penalizace za málo tradů (pod 20 tradů = nespolehlivý vzorek)
+    trade_count = stats.get("total_trades", 0)
+    trade_penalty = min(trade_count / 20, 1.0)  # lineární 0→1 pro 0→20 tradů
+
     score = (
-        wr_score  * 0.25 +
+        wr_score  * 0.20 +
         pf_score  * 0.20 +
-        rr_score  * 0.20 +
+        rr_score  * 0.15 +
         pnl_score * 0.15 +
         dd_score  * 0.10 +
-        sh_score  * 0.10
+        sh_score  * 0.10 +
+        trade_penalty * 0.10  # bonus za dostatečný počet tradů
     )
     return round(score * 100, 2)
 
@@ -300,18 +311,50 @@ def run_optimization(
         top10 = results[:10]
         best  = top10[0]
 
-        # 6. Verifikace na OUT-OF-SAMPLE
+        # 6. Verifikace na OUT-OF-SAMPLE (interně, bez přenačítání dat)
         oos_params = dict(base_params)
         oos_params.update(best["params"])
+        # Předej všechny varianty klíčů
+        for opt_p in opt_params:
+            k = opt_p["key"]
+            raw_k = opt_p.get("raw_key", k)
+            v = best["params"].get(k)
+            if v is not None:
+                oos_params[k] = v
+                oos_params[raw_k] = v
+                oos_params[k.lower()] = v
+                oos_params[k.upper()] = v
 
-        oos_result = run_backtest(
-            bot_code, csv_content,
-            oos_from, oos_to,
-            oos_params, timeframe
-        )
+        df_oos = df_full.copy()
+        if oos_from:
+            ts = pd.Timestamp(oos_from)
+            if df_oos.index.tz is not None:
+                ts = ts.tz_localize("UTC")
+            df_oos = df_oos[df_oos.index >= ts]
+        if oos_to:
+            ts = pd.Timestamp(oos_to)
+            if df_oos.index.tz is not None:
+                ts = ts.tz_localize("UTC")
+            df_oos = df_oos[df_oos.index <= ts]
 
-        oos_stats  = oos_result["stats"]  if oos_result["success"] else {}
-        oos_equity = oos_result["equity"] if oos_result["success"] else []
+        try:
+            if style_info["style"] == "run_backtest":
+                oos_trades, _ = _simulate_run_backtest_style(prepared_code, df_oos, oos_params)
+            else:
+                oos_signals = _generate_signals_vectorized(df_oos, style_info, prepared_code, oos_params)
+                oos_trades  = _simulate_vectorized(df_oos, oos_signals, style_info, oos_params)
+            oos_stats = _compute_stats_fast(oos_trades) if oos_trades else {}
+        except Exception:
+            oos_stats = {}
+            oos_trades = []
+
+        # Generuj OOS equity křivku
+        oos_equity = []
+        if oos_trades:
+            cumulative = 0
+            for t in oos_trades:
+                cumulative += t.get("pnl", 0)
+                oos_equity.append(round(cumulative, 2))
 
         # 7. Verdict
         verdict, verdict_msg = _evaluate_verdict(best["stats"], oos_stats, goals)
@@ -357,7 +400,21 @@ def _evaluate_verdict(is_stats: dict, oos_stats: dict, goals: dict) -> tuple:
     if not oos_stats or not oos_stats.get("total_trades"):
         return "WARN", "OOS data neobsahují dostatek tradů pro spolehlivé hodnocení."
 
+    oos_trades = oos_stats.get("total_trades", 0)
+    if oos_trades < 10:
+        return "WARN", (
+            f"⚠️ OOS obsahuje jen {oos_trades} tradů — příliš málo pro spolehlivé hodnocení. "
+            f"Zvětšete OOS období."
+        )
+
+    # Detekce overfittingu — extrémní IS winrate
     is_wr  = is_stats.get("winrate", 0)
+    if is_wr > 90:
+        return "WARN", (
+            f"⚠️ IS winrate {is_wr}% je podezřele vysoký — pravděpodobný overfitting. "
+            f"Zkontrolujte logiku strategie a zvětšete IS období."
+        )
+
     oos_wr = oos_stats.get("winrate", 0)
     is_pnl  = is_stats.get("total_pnl", 0)
     oos_pnl = oos_stats.get("total_pnl", 0)

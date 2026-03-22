@@ -542,11 +542,22 @@ tr:hover td{background:var(--s2)66}
         </div>
 
         <div class="card">
-          <div class="card-title">CSV Data</div>
-          <div class="drop-zone" id="dz" onclick="document.getElementById('csv-inp').click()">
-            <div class="dz-ic">📂</div>
-            <p id="dz-txt">Přetáhni CSV / Parquet nebo klikni pro výběr</p>
-            <p style="font-size:11px;margin-top:6px">CSV nebo Parquet · sloupce: datetime, open, high, low, close, volume</p>
+          <div class="card-title">Data</div>
+          <div id="saved-data-wrap" style="display:none;margin-bottom:12px">
+            <label style="font-size:12px;color:var(--tx3);margin-bottom:4px;display:block">Uložená data</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="saved-data-sel" class="inp" style="flex:1" onchange="selectSavedData(this.value)">
+                <option value="">— nahrát nový soubor —</option>
+              </select>
+              <button class="btn btn-sm btn-ghost" id="saved-data-del" style="color:var(--red);border-color:var(--red)22;padding:3px 8px;display:none" onclick="deleteSavedData()" title="Smazat">🗑</button>
+            </div>
+          </div>
+          <div id="dz-wrap">
+            <div class="drop-zone" id="dz" onclick="document.getElementById('csv-inp').click()">
+              <div class="dz-ic">📂</div>
+              <p id="dz-txt">Přetáhni CSV / Parquet nebo klikni pro výběr</p>
+              <p style="font-size:11px;margin-top:6px">CSV nebo Parquet · sloupce: datetime, open, high, low, close, volume</p>
+            </div>
           </div>
           <input type="file" id="csv-inp" accept=".csv,.parquet" style="display:none" onchange="handleCsv(this)">
           <div id="csv-info" style="display:none;margin-top:10px;font-size:12px;color:var(--green);font-family:var(--mono)"></div>
@@ -939,16 +950,16 @@ tr:hover td{background:var(--s2)66}
         <div class="card" style="background:var(--s2)">
           <div class="card-title" style="color:var(--blue)">📊 In-Sample (Optimalizace)</div>
           <div class="g2" style="gap:10px">
-            <div class="frow"><label>Od</label><input type="datetime-local" id="opt-is-from"></div>
-            <div class="frow"><label>Do</label><input type="datetime-local" id="opt-is-to"></div>
+            <div class="frow"><label>Od</label><input type="date" id="opt-is-from"></div>
+            <div class="frow"><label>Do</label><input type="date" id="opt-is-to"></div>
           </div>
           <p class="fhint" style="margin-top:8px">Na tomto období se hledají nejlepší parametry</p>
         </div>
         <div class="card" style="background:var(--s2)">
           <div class="card-title" style="color:var(--green)">✅ Out-of-Sample (Verifikace)</div>
           <div class="g2" style="gap:10px">
-            <div class="frow"><label>Od</label><input type="datetime-local" id="opt-oos-from"></div>
-            <div class="frow"><label>Do</label><input type="datetime-local" id="opt-oos-to"></div>
+            <div class="frow"><label>Od</label><input type="date" id="opt-oos-from"></div>
+            <div class="frow"><label>Do</label><input type="date" id="opt-oos-to"></div>
           </div>
           <p class="fhint" style="margin-top:8px">Na tomto období se ověří, zda parametry fungují</p>
         </div>
@@ -1132,7 +1143,7 @@ function navigate(page, el) {
   if (pg) { pg.style.display = 'block'; void pg.offsetWidth; pg.classList.add('fade-up'); }
   if (page === 'tradelog') loadTrades();
   if (page === 'stats')    loadStats();
-  if (page === 'backtest') { populateBtBots(); loadBtHistory(); }
+  if (page === 'backtest') { populateBtBots(); loadBtHistory(); loadSavedData(); }
 }
 
 // ═══ LOAD BOTS ════════════════════════════════════════════════════
@@ -1497,6 +1508,62 @@ function setupDragDrop() {
 
 let csvServerId = null;
 
+async function loadSavedData() {
+  try {
+    const res = await fetch('/api/data/files');
+    const files = await res.json();
+    const sel = document.getElementById('saved-data-sel');
+    const wrap = document.getElementById('saved-data-wrap');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— nahrát nový soubor —</option>';
+    files.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({id: f.id, csv_id: f.csv_id, name: f.original_name, rows: f.rows});
+      const baseName = f.original_name.replace(/\.(csv|parquet)$/i, '');
+      opt.textContent = `${baseName}  (${f.format || 'parquet'} · ${(f.rows||0).toLocaleString()} svíček)`;
+      sel.appendChild(opt);
+    });
+    wrap.style.display = files.length ? 'block' : 'none';
+  } catch(e) {}
+}
+
+function selectSavedData(val) {
+  const dzWrap = document.getElementById('dz-wrap');
+  const info   = document.getElementById('csv-info');
+  const delBtn = document.getElementById('saved-data-del');
+  if (!val) {
+    // "nahrát nový" — zobraz drop zone
+    dzWrap.style.display = 'block';
+    info.style.display   = 'none';
+    csvServerId = null;
+    csvContent  = null;
+    delBtn.style.display = 'none';
+    document.getElementById('dz-txt').textContent = 'Přetáhni CSV / Parquet nebo klikni pro výběr';
+    return;
+  }
+  const f = JSON.parse(val);
+  csvServerId = f.csv_id;
+  csvContent  = null;
+  dzWrap.style.display = 'none';
+  info.style.display   = 'block';
+  info.style.color     = 'var(--green)';
+  info.textContent     = `✓ ${f.name} · ${(f.rows||0).toLocaleString()} svíček`;
+  delBtn.style.display = 'inline-flex';
+}
+
+async function deleteSavedData() {
+  const sel = document.getElementById('saved-data-sel');
+  if (!sel.value) return;
+  const f = JSON.parse(sel.value);
+  if (!confirm(`Smazat soubor "${f.name}"?`)) return;
+  await fetch(`/api/data/files/${f.id}`, {method:'DELETE'});
+  toast('🗑 Data smazána', 'warn');
+  if (csvServerId === f.csv_id) { csvServerId = null; csvContent = null; }
+  loadSavedData();
+  selectSavedData('');
+  sel.value = '';
+}
+
 async function handleCsv(inp) {
   const f = inp.files[0]; if (!f) return;
   const dz   = document.getElementById('dz-txt');
@@ -1507,7 +1574,6 @@ async function handleCsv(inp) {
   info.style.color     = 'var(--tx3)';
   info.textContent     = 'Odesílám soubor na server...';
 
-  // Použij FormData - soubor se pošle přímo, NEČTE se do paměti prohlížeče
   try {
     const fd = new FormData();
     fd.append('file', f);
@@ -1516,10 +1582,21 @@ async function handleCsv(inp) {
 
     if (data.csv_id) {
       csvServerId  = data.csv_id;
-      csvContent   = null;  // Nepotřebujeme v paměti
+      csvContent   = null;
       dz.textContent     = `✅ ${f.name}`;
       info.style.color   = 'var(--green)';
       info.textContent   = `✓ ${(data.rows||0).toLocaleString()} svíček uloženo`;
+      // Refresh saved data list and select the new file
+      await loadSavedData();
+      const sel = document.getElementById('saved-data-sel');
+      for (const opt of sel.options) {
+        if (opt.value && JSON.parse(opt.value).csv_id === data.csv_id) {
+          sel.value = opt.value;
+          document.getElementById('dz-wrap').style.display = 'none';
+          document.getElementById('saved-data-del').style.display = 'inline-flex';
+          break;
+        }
+      }
     } else {
       throw new Error(data.error || 'Upload selhal');
     }
@@ -2162,11 +2239,11 @@ async function runOptimization() {
   let oosFrom = document.getElementById('opt-oos-from').value;
   let oosTo   = document.getElementById('opt-oos-to').value;
 
-  // Přidej čas pokud chybí (jen datum)
-  if (isFrom  && isFrom.length  === 10) isFrom  += 'T00:00';
-  if (isTo    && isTo.length    === 10) isTo    += 'T23:59';
-  if (oosFrom && oosFrom.length === 10) oosFrom += 'T00:00';
-  if (oosTo   && oosTo.length   === 10) oosTo   += 'T23:59';
+  // Doplň výchozí časy (date input vrací jen datum bez času)
+  if (isFrom  && !isFrom.includes('T'))  isFrom  += 'T00:00';
+  if (isTo    && !isTo.includes('T'))    isTo    += 'T23:59';
+  if (oosFrom && !oosFrom.includes('T')) oosFrom += 'T00:00';
+  if (oosTo   && !oosTo.includes('T'))   oosTo   += 'T23:59';
 
   if (!isFrom || !isTo)   { toast('Zadej In-Sample období!', 'error'); return; }
   if (!oosFrom || !oosTo) { toast('Zadej Out-of-Sample období!', 'error'); return; }

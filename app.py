@@ -342,27 +342,27 @@ def api_csv_upload():
     """
     if "file" in request.files:
         f = request.files["file"]
-        filename = (f.filename or "").lower()
+        orig_name = f.filename or "data"
+        filename = orig_name.lower()
         if filename.endswith(".parquet"):
             csv_id   = uuid.uuid4().hex[:12]
             csv_dir  = Path(__file__).parent / "data" / "csv_cache"
             csv_dir.mkdir(exist_ok=True)
             path = csv_dir / f"{csv_id}.parquet"
             f.save(str(path))
-            # Spočítej řádky přes pandas
             try:
                 import pandas as pd
                 rows = len(pd.read_parquet(str(path), columns=["close"] if True else []))
             except Exception:
                 rows = 0
-            return jsonify({"csv_id": csv_id, "rows": rows, "format": "parquet"})
+            db.save_data_file(csv_id, orig_name, rows, "parquet")
+            return jsonify({"csv_id": csv_id, "rows": rows, "format": "parquet", "name": orig_name})
         elif filename.endswith(".csv"):
             csv_id   = uuid.uuid4().hex[:12]
             csv_dir  = Path(__file__).parent / "data" / "csv_cache"
             csv_dir.mkdir(exist_ok=True)
             csv_path = csv_dir / f"{csv_id}.csv"
             f.save(str(csv_path))
-            # Konvertuj CSV → Parquet pro rychlejší načítání
             try:
                 import pandas as pd
                 from backtest import load_csv
@@ -370,12 +370,14 @@ def api_csv_upload():
                 if df is not None and not df.empty:
                     pq_path = csv_dir / f"{csv_id}.parquet"
                     df.to_parquet(str(pq_path), index=True)
-                    csv_path.unlink()  # smaž původní CSV
-                    return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet"})
+                    csv_path.unlink()
+                    db.save_data_file(csv_id, orig_name, len(df), "parquet")
+                    return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet", "name": orig_name})
             except Exception:
-                pass  # fallback: ponech CSV
+                pass
             rows = sum(1 for _ in open(csv_path, encoding="utf-8", errors="replace")) - 1
-            return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv"})
+            db.save_data_file(csv_id, orig_name, rows, "csv")
+            return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv", "name": orig_name})
         else:
             return jsonify({"error": "Soubor musí mít příponu .csv nebo .parquet"}), 400
 
@@ -386,7 +388,6 @@ def api_csv_upload():
     csv_id   = uuid.uuid4().hex[:12]
     csv_dir  = Path(__file__).parent / "data" / "csv_cache"
     csv_dir.mkdir(exist_ok=True)
-    # Konvertuj CSV → Parquet
     try:
         import pandas as pd
         from backtest import load_csv
@@ -394,13 +395,32 @@ def api_csv_upload():
         if df is not None and not df.empty:
             pq_path = csv_dir / f"{csv_id}.parquet"
             df.to_parquet(str(pq_path), index=True)
-            return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet"})
+            db.save_data_file(csv_id, "upload.csv", len(df), "parquet")
+            return jsonify({"csv_id": csv_id, "rows": len(df), "format": "parquet", "name": "upload.csv"})
     except Exception:
         pass
     csv_path = csv_dir / f"{csv_id}.csv"
     csv_path.write_text(csv_data, encoding="utf-8")
     rows = csv_data.count("\n")
-    return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv"})
+    db.save_data_file(csv_id, "upload.csv", rows, "csv")
+    return jsonify({"csv_id": csv_id, "rows": rows, "format": "csv", "name": "upload.csv"})
+
+
+@app.route("/api/data/files")
+def api_data_files():
+    return jsonify(db.get_data_files())
+
+
+@app.route("/api/data/files/<int:file_id>", methods=["DELETE"])
+def api_delete_data_file(file_id):
+    csv_id = db.delete_data_file(file_id)
+    if csv_id:
+        base = Path(__file__).parent / "data" / "csv_cache"
+        for ext in (".parquet", ".csv"):
+            p = base / f"{csv_id}{ext}"
+            if p.exists():
+                p.unlink()
+    return jsonify({"ok": True})
 
 
 def _load_data_by_id(csv_id: str):
@@ -598,14 +618,18 @@ def api_opt_apply(result_id):
 # ═══ START ═════════════════════════════════════════════════════════════════
 
 def cleanup_csv_cache():
-    """Smaže CSV/Parquet soubory starší než 24 hodin."""
+    """Smaže CSV/Parquet soubory starší než 24 hodin, pokud nejsou uložené v DB."""
     cache_dir = Path(__file__).parent / "data" / "csv_cache"
     if not cache_dir.exists():
         return
+    saved_ids = {f["csv_id"] for f in db.get_data_files()}
     now = time.time()
     deleted = 0
     for pattern in ("*.csv", "*.parquet"):
         for f in cache_dir.glob(pattern):
+            csv_id = f.stem
+            if csv_id in saved_ids:
+                continue  # uložený soubor — nemaž
             if now - f.stat().st_mtime > 86400:
                 f.unlink()
                 deleted += 1
@@ -618,7 +642,8 @@ if __name__ == "__main__":
     cleanup_csv_cache()
     print("\n" + "═"*50)
     print("  ⚡  TRADING HUB")
-    print("  🌐  http://localhost:5000")
+    port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else int(os.environ.get("PORT", 5000))
+    print(f"  🌐  http://localhost:{port}")
     print("  🛑  Zastav: Ctrl+C")
     print("═"*50 + "\n")
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
