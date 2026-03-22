@@ -89,7 +89,7 @@ def init_db():
             -- Přidej sloupce pokud chybí (pro existující DB)
             CREATE TABLE IF NOT EXISTS _dummy_bt (id INTEGER);
         """)
-    print("✓ Databáze inicializována")
+    print("OK Databaze inicializovana")
 
 
 # ═══ BOTS ═════════════════════════════════════════════════════════════════════
@@ -259,20 +259,6 @@ def save_optimization(bot_id, bot_name, insample_from, insample_to,
                       oos_stats, oos_equity, top_results, verdict,
                       verdict_msg, tested_combos, elapsed_sec):
     with get_conn() as conn:
-        try:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS optimization_results (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    bot_id TEXT, bot_name TEXT,
-                    insample_from TEXT, insample_to TEXT,
-                    oos_from TEXT, oos_to TEXT,
-                    best_params TEXT, insample_stats TEXT,
-                    oos_stats TEXT, oos_equity TEXT, top_results TEXT,
-                    verdict TEXT, verdict_msg TEXT,
-                    tested_combos INTEGER, elapsed_sec REAL,
-                    created_at TEXT DEFAULT (datetime('now'))
-                )""")
-        except Exception: pass
         conn.execute("""
             INSERT INTO optimization_results
             (bot_id,bot_name,insample_from,insample_to,oos_from,oos_to,

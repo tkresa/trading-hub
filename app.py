@@ -28,39 +28,20 @@ if sys.platform == "win32":
 import database as db
 from backtest import run_backtest
 from optimizer import run_optimization, detect_opt_params, estimate_combinations
-# DB funkce pro optimalizace importujeme přímo z db modulu
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
-
-
-def _cleanup_csv_cache():
-    """Smaže CSV cache soubory starší než 24 hodin."""
-    import time
-    csv_dir = Path(__file__).parent / "data" / "csv_cache"
-    if not csv_dir.exists():
-        return
-    now = time.time()
-    deleted = 0
-    for f in csv_dir.glob("*.csv"):
-        try:
-            if now - f.stat().st_mtime > 86400:  # 24 hodin
-                f.unlink()
-                deleted += 1
-        except Exception:
-            pass
-    if deleted:
-        print(f"[CSV Cache] Smazáno {deleted} starých souborů")
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB max upload
 
 # ── Process registry ───────────────────────────────────────────────────────
 _processes: dict = {}
 _log_buffers: dict = {}
+_lock = threading.Lock()
 MAX_LOG = 500
 
 
 def bot_status(bot_id):
-    proc = _processes.get(bot_id)
+    with _lock:
+        proc = _processes.get(bot_id)
     if proc is None: return "stopped"
     return "running" if proc.poll() is None else "stopped"
 
@@ -114,7 +95,6 @@ def inject_params(code, params):
             continue
         modified = line
         for key, value in params.items():
-            # Nahraď DOPLNIT na tomto řádku pokud řádek obsahuje název proměnné
             if key in line:
                 modified = re.sub(r'["\']DOPLNIT["\']', f'"{value}"', modified)
                 break
@@ -157,28 +137,21 @@ def stream_process(bot_id, proc):
 
 @app.errorhandler(413)
 def too_large(e):
-    return jsonify({"error": "Soubor je příliš velký. Maximum je 500MB."}), 413
+    return jsonify({"error": "Soubor je příliš velký. Maximum je 500 MB."}), 413
 
 
 @app.route("/favicon.ico")
 def favicon():
-    """Jednoduchý favicon aby prohlížeč nehazoval 404."""
     svg = b'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="8" fill="#3b82f6"/>
   <text x="16" y="23" font-size="20" text-anchor="middle" fill="white">&#x26A1;</text>
 </svg>'''
-    from flask import Response
     return Response(svg, mimetype="image/svg+xml")
 
 
 @app.route("/")
 def index():
     return render_template("index.html")
-
-
-@app.errorhandler(413)
-def too_large(e):
-    return jsonify({"error": "Soubor je příliš velký. Maximum je 500 MB."}), 413
 
 
 # ═══ BOTS ═════════════════════════════════════════════════════════════════
@@ -205,11 +178,14 @@ def api_get_bot(bot_id):
 @app.route("/api/bots", methods=["POST"])
 def api_create_bot():
     data = request.json
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Název bota je povinný"}), 400
     code = data.get("code", "")
     params = data.get("params", {})
-    bot_id = uuid.uuid4().hex[:10]
-    db.create_bot(bot_id, data.get("name","Nový bot"),
-                  data.get("description",""), data.get("instrument",""),
+    bot_id = uuid.uuid4().hex[:12]
+    db.create_bot(bot_id, name,
+                  data.get("description", ""), data.get("instrument", ""),
                   inject_params(code, params), params)
     return jsonify({"id": bot_id}), 201
 
@@ -250,17 +226,6 @@ def api_scan():
 
 # ═══ START / STOP ══════════════════════════════════════════════════════════
 
-# ── Progress tracking ─────────────────────────────────────────────────────
-_progress: dict = {}  # task_id → {status, pct, msg}
-
-@app.route("/api/progress/<task_id>")
-def get_progress(task_id):
-    return jsonify(_progress.get(task_id, {"status": "unknown", "pct": 0, "msg": ""}))
-
-def set_progress(task_id: str, pct: int, msg: str, status: str = "running"):
-    _progress[task_id] = {"status": status, "pct": pct, "msg": msg}
-
-
 @app.route("/api/bots/<bot_id>/start", methods=["POST"])
 def api_start(bot_id):
     if bot_status(bot_id) == "running":
@@ -283,7 +248,8 @@ def api_start(bot_id):
         env={**os.environ, "BOT_ID": bot_id, "BOT_NAME": b["name"],
              "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
     )
-    _processes[bot_id] = proc
+    with _lock:
+        _processes[bot_id] = proc
     # Načti existující logy ze souboru (přežijí restart aplikace)
     log_file = Path(__file__).parent / "logs" / f"{bot_id}.log"
     if log_file.exists():
@@ -306,7 +272,8 @@ def api_stop(bot_id):
 
 
 def _stop_bot(bot_id):
-    proc = _processes.pop(bot_id, None)
+    with _lock:
+        proc = _processes.pop(bot_id, None)
     if proc and proc.poll() is None:
         proc.terminate()
         try: proc.wait(timeout=5)
@@ -358,19 +325,20 @@ def api_stats():
 @app.route("/api/csv/upload", methods=["POST"])
 def api_csv_upload():
     """
-    Přijme CSV soubor přes multipart upload (bez načítání do paměti prohlížeče).
+    Přijme CSV soubor přes multipart upload.
     Vrátí csv_id pro použití v backtestu a optimalizaci.
     """
-    import uuid
-    # Multipart upload (preferovaný - nespotřebuje paměť prohlížeče)
+    # Multipart upload (preferovaný)
     if "file" in request.files:
         f = request.files["file"]
-        csv_id  = uuid.uuid4().hex[:12]
-        csv_dir = Path(__file__).parent / "data" / "csv_cache"
+        filename = f.filename or ""
+        if not filename.lower().endswith(".csv"):
+            return jsonify({"error": "Soubor musí mít příponu .csv"}), 400
+        csv_id   = uuid.uuid4().hex[:12]
+        csv_dir  = Path(__file__).parent / "data" / "csv_cache"
         csv_dir.mkdir(exist_ok=True)
         csv_path = csv_dir / f"{csv_id}.csv"
         f.save(str(csv_path))
-        # Spočítej řádky efektivně
         rows = sum(1 for _ in open(csv_path, encoding="utf-8", errors="replace")) - 1
         return jsonify({"csv_id": csv_id, "rows": rows})
 
@@ -378,8 +346,8 @@ def api_csv_upload():
     csv_data = request.json.get("csv", "") if request.is_json else ""
     if not csv_data:
         return jsonify({"error": "Prázdné CSV nebo chybí soubor"}), 400
-    csv_id  = uuid.uuid4().hex[:12]
-    csv_dir = Path(__file__).parent / "data" / "csv_cache"
+    csv_id   = uuid.uuid4().hex[:12]
+    csv_dir  = Path(__file__).parent / "data" / "csv_cache"
     csv_dir.mkdir(exist_ok=True)
     csv_path = csv_dir / f"{csv_id}.csv"
     csv_path.write_text(csv_data, encoding="utf-8")
@@ -388,7 +356,10 @@ def api_csv_upload():
 
 
 def _load_csv_by_id(csv_id: str) -> str | None:
-    """Načte CSV ze serveru podle ID."""
+    """Načte CSV ze serveru podle ID. Brání path traversal."""
+    # Povolíme pouze hex znaky (bezpečné ID)
+    if not re.fullmatch(r'[0-9a-f]{12}', csv_id):
+        return None
     csv_path = Path(__file__).parent / "data" / "csv_cache" / f"{csv_id}.csv"
     if csv_path.exists():
         return csv_path.read_text(encoding="utf-8")
@@ -403,20 +374,13 @@ def api_backtest_run():
     params = json.loads(b.get("params") or "{}")
     timeframe     = int(data.get("timeframe", 1))
     start_balance = float(data.get("start_balance", 50000))
-    task_id       = data.get("task_id", "bt_default")
-    set_progress(task_id, 5, "Načítám CSV a resamplinguji data...")
     params["start_balance"] = start_balance
-    # Podporuj csv_id (ze serveru) i přímé csv (zpětná kompatibilita)
     csv_content = data.get("csv", "")
     if not csv_content and data.get("csv_id"):
         csv_content = _load_csv_by_id(data["csv_id"]) or ""
-    import uuid
-    op_id = uuid.uuid4().hex[:8]
-    _set_progress(op_id, 10, "Načítám data...")
     result = run_backtest(b["code"], csv_content,
                           data.get("period_from",""), data.get("period_to",""),
                           params, timeframe_minutes=timeframe)
-    _set_progress(op_id, 100, "Hotovo")
     if result["success"]:
         s = result["stats"]
         db.save_backtest(b["id"], b["name"], data.get("period_from",""), data.get("period_to",""),
@@ -464,32 +428,6 @@ def api_scan_opt_params():
     return jsonify({"params": params, "total_combos": combos})
 
 
-# Progress tracking pro dlouhé operace
-_progress_store: dict = {}
-
-
-def _set_progress(op_id: str, pct: int, msg: str):
-    _progress_store[op_id] = {"pct": pct, "msg": msg}
-
-
-@app.route("/api/progress/<op_id>")
-def api_progress(op_id):
-    """SSE stream pro progress bar."""
-    import time
-    def gen():
-        last = None
-        for _ in range(600):  # max 10 min
-            p = _progress_store.get(op_id, {"pct": 0, "msg": "Čekám..."})
-            if p != last:
-                yield f"data: {json.dumps(p)}\n\n"
-                last = p
-            if p.get("pct", 0) >= 100:
-                break
-            time.sleep(1)
-    return Response(gen(), mimetype="text/event-stream",
-                    headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
-
-
 @app.route("/api/backtest/optimize", methods=["POST"])
 def api_optimize():
     """Spustí Walk-Forward Optimization."""
@@ -524,7 +462,6 @@ def api_optimize():
         timeframe     = int(data.get("timeframe", 3)),
         max_combos    = int(data.get("max_combos", 500)),
     )
-    # Ulož výsledek do DB
     if result.get("success"):
         db.save_optimization(
             bot_id        = bot_id,
@@ -569,14 +506,13 @@ def api_opt_delete(result_id):
 
 def cleanup_csv_cache():
     """Smaže CSV soubory starší než 24 hodin."""
-    import time
     cache_dir = Path(__file__).parent / "data" / "csv_cache"
     if not cache_dir.exists():
         return
     now = time.time()
     deleted = 0
     for f in cache_dir.glob("*.csv"):
-        if now - f.stat().st_mtime > 86400:  # 24h
+        if now - f.stat().st_mtime > 86400:
             f.unlink()
             deleted += 1
     if deleted:
